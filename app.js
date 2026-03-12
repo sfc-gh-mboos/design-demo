@@ -205,9 +205,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let draggedTask = null;
   let draggedTaskElement = null;
-  let draggedFromStatus = null;
+  let statusUpdateInFlight = false;
 
   function handleDragStart(e) {
+    if (statusUpdateInFlight) {
+      e.preventDefault();
+      return;
+    }
+
     const taskCard = e.currentTarget;
     const parsedTaskId = Number(taskCard?.dataset.taskId);
     if (!taskCard || Number.isNaN(parsedTaskId)) return;
@@ -218,7 +223,6 @@ document.addEventListener("DOMContentLoaded", () => {
       id: parsedTaskId,
       status: draggedTaskElement.dataset.status,
     };
-    draggedFromStatus = draggedTask.status;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", String(draggedTask.id));
     
@@ -246,7 +250,6 @@ document.addEventListener("DOMContentLoaded", () => {
     
     draggedTask = null;
     draggedTaskElement = null;
-    draggedFromStatus = null;
   }
 
   function setupColumnDropZone(columnNode, status) {
@@ -273,12 +276,15 @@ document.addEventListener("DOMContentLoaded", () => {
       e.stopPropagation();
       columnNode.classList.remove("drag-over");
       
-      if (!draggedTask || draggedTask.status === status) {
+      if (statusUpdateInFlight || !draggedTask || draggedTask.status === status) {
         return; // No change needed
       }
+
+      const activeDrag = draggedTask;
+      const taskId = activeDrag.id;
       
       // Optimistic update: move card immediately in UI
-      const originalTask = state.tasks.find((t) => t.id === draggedTask.id);
+      const originalTask = state.tasks.find((t) => Number(t.id) === taskId);
       if (!originalTask) return;
       
       const originalStatus = originalTask.status;
@@ -289,8 +295,9 @@ document.addEventListener("DOMContentLoaded", () => {
       renderBoard(visibleTasks);
       
       // Persist change via API
+      statusUpdateInFlight = true;
       try {
-        const response = await TaskAPI.update(draggedTask.id, { status });
+        const response = await TaskAPI.update(taskId, { status });
         if (response.error) {
           throw new Error(response.error);
         }
@@ -303,6 +310,8 @@ document.addEventListener("DOMContentLoaded", () => {
         
         // Show error feedback
         showErrorFeedback("Failed to update task status. Please try again.");
+      } finally {
+        statusUpdateInFlight = false;
       }
     });
   }
