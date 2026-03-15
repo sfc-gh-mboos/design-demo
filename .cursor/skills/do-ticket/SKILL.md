@@ -27,7 +27,31 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
 
    Extract: summary, description, acceptance criteria, linked issues.
 
-2. **Explore the codebase**
+2. **Check for Figma designs** (conditional)
+
+   Scan the ticket description and attachments for Figma URLs matching
+   `figma.com/design/` or `figma.com/make/`.
+
+   If found, extract `fileKey` and `nodeId` from the URL and fetch the design:
+   ```
+   server: plugin-figma-figma
+   tool: get_design_context
+   args: { "fileKey": "<fileKey>", "nodeId": "<nodeId>" }
+   ```
+   ```
+   server: plugin-figma-figma
+   tool: get_screenshot
+   args: { "fileKey": "<fileKey>", "nodeId": "<nodeId>" }
+   ```
+
+   This returns reference code, a screenshot, and contextual hints.
+   - Use the screenshot as the visual spec during implementation
+   - Adapt the reference code to the project's stack and conventions
+   - Do NOT copy the reference code verbatim — it is a starting point
+
+   If no Figma URL is found, skip this step entirely.
+
+3. **Explore the codebase**
 
    Launch an `explore` subagent to understand:
    - Relevant files and modules
@@ -35,7 +59,7 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
    - Dependencies and interfaces
    - Test coverage expectations
 
-3. **Ask clarifying questions**
+4. **Ask clarifying questions**
 
    Use `AskQuestion` tool to resolve ambiguities:
    - Scope boundaries
@@ -45,7 +69,7 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
 
 ### Phase 2: Plan
 
-4. **Create implementation plan**
+5. **Create implementation plan**
 
    Structure the plan:
    ```markdown
@@ -53,6 +77,10 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
 
    ## Scope
    [What's in/out of scope]
+
+   ## Design Reference
+   [If Figma URL was found in step 2, include the link and a summary of the
+   design intent. Otherwise omit this section.]
 
    ## Approach
    [Technical approach and rationale]
@@ -78,7 +106,7 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
    - [Risk and mitigation]
    ```
 
-5. **Publish plan to Notion**
+6. **Publish plan to Notion**
 
    Use `notion-create-pages` from the `user-Notion` MCP:
    ```
@@ -98,7 +126,7 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
 
 ### Phase 3: Implement
 
-6. **Check out feature branch**
+7. **Check out feature branch**
 
    Branch name format: `av-<ticket-id>-<short-description>` (lowercase).
 
@@ -106,15 +134,17 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
    git checkout -b av-graf-123-short-description
    ```
 
-7. **Implement the changes**
+8. **Implement the changes**
 
    Follow the plan step by step:
    - Make changes incrementally
    - Run linting after edits (`ReadLints`)
    - Run relevant tests as you go
    - Stage logically related changes together
+   - When building UI components, reference the Figma screenshot from step 2
+     to validate visual fidelity (if one was fetched)
 
-8. **Organize commits**
+9. **Organize commits**
 
    Group related changes into logical commits:
    - Use `<Area>: <Summary>` format for messages
@@ -124,7 +154,7 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
 
 ### Phase 4: Ship
 
-9. **Push and create PR**
+10. **Push and create PR**
 
    ```bash
    git push -u origin HEAD
@@ -137,11 +167,12 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
      --body "<PR description>"
    ```
 
-10. **Output links**
+11. **Output links**
 
     Provide the user with:
     - GitHub PR URL
     - Notion plan URL
+    - Figma design URL (if applicable)
     - Summary of changes made
 
 ## PR Description Template
@@ -155,6 +186,9 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
 
 ## Implementation Plan
 [Link to Notion page]
+
+## Design
+[Figma link, if applicable]
 
 ## Changes
 - [Change 1]
@@ -179,6 +213,7 @@ Implement a Jira ticket from start to finish: read → plan → clarify → publ
 Before completing:
 
 - [ ] Jira ticket read and understood
+- [ ] Figma designs fetched (if linked in ticket)
 - [ ] Clarifying questions resolved
 - [ ] Implementation plan published to Notion
 - [ ] Feature branch created with `av-` prefix
