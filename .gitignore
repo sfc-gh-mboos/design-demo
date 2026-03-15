@@ -4,7 +4,8 @@ __pycache__/
 .pytest_cache/
 *.db
 .idea/
-.cursor/
+.cursor/*
+!.cursor/skills/
 *.egg-info/
 dist/
 build/
