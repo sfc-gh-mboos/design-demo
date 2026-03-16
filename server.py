@@ -366,8 +366,10 @@ def analytics_heatmap():
     weeks = max(1, min(weeks, 52))
 
     conn = get_db()
-    end_date = datetime.now(timezone.utc).date()
-    start_date = end_date - timedelta(weeks=weeks)
+    today = datetime.now(timezone.utc).date()
+    end_date = today
+    start_date = end_date - timedelta(weeks=weeks) + timedelta(days=1)
+    start_date -= timedelta(days=start_date.weekday())
 
     rows = conn.execute(
         """SELECT DATE(completed_at) as day, COUNT(*) as count
@@ -375,38 +377,46 @@ def analytics_heatmap():
            WHERE completed_at IS NOT NULL
              AND DATE(completed_at) >= ?
              AND DATE(completed_at) <= ?
-           GROUP BY DATE(completed_at)
-           ORDER BY day""",
+           GROUP BY DATE(completed_at)""",
         (start_date.isoformat(), end_date.isoformat()),
     ).fetchall()
-    conn.close()
 
-    counts_by_date = {row["day"]: row["count"] for row in rows}
+    counts = {row["day"]: row["count"] for row in rows}
 
     days = []
     d = start_date
     while d <= end_date:
         iso = d.isoformat()
-        days.append({"date": iso, "count": counts_by_date.get(iso, 0)})
+        days.append({"date": iso, "count": counts.get(iso, 0)})
         d += timedelta(days=1)
 
-    total = sum(entry["count"] for entry in days)
+    all_completed = conn.execute(
+        "SELECT DATE(completed_at) as day FROM tasks WHERE completed_at IS NOT NULL ORDER BY day"
+    ).fetchall()
+    conn.close()
+
+    completed_dates = sorted({row["day"] for row in all_completed})
+
+    total = sum(item["count"] for item in days)
 
     current_streak = 0
-    for entry in reversed(days):
-        if entry["count"] > 0:
-            current_streak += 1
-        else:
-            break
+    d = today
+    completed_set = set(completed_dates)
+    while d.isoformat() in completed_set:
+        current_streak += 1
+        d -= timedelta(days=1)
 
     longest_streak = 0
     streak = 0
-    for entry in days:
-        if entry["count"] > 0:
+    prev = None
+    for ds in completed_dates:
+        dt = datetime.strptime(ds, "%Y-%m-%d").date()
+        if prev and (dt - prev).days == 1:
             streak += 1
-            longest_streak = max(longest_streak, streak)
         else:
-            streak = 0
+            streak = 1
+        longest_streak = max(longest_streak, streak)
+        prev = dt
 
     return jsonify({
         "days": days,
