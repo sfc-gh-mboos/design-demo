@@ -1,4 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const navLinks = document.querySelectorAll("[data-page-link]");
+  const tasksPage = document.getElementById("tasksPage");
+  const analyticsPage = document.getElementById("analyticsPage");
   const filters = document.getElementById("filters");
   const viewToggle = document.getElementById("viewToggle");
   const searchInput = document.getElementById("searchInput");
@@ -7,12 +10,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const boardView = document.getElementById("boardView");
   const taskCount = document.getElementById("taskCount");
   const dateLabel = document.getElementById("dateLabel");
+  const currentStreak = document.getElementById("currentStreak");
+  const longestStreak = document.getElementById("longestStreak");
+  const totalCompletions = document.getElementById("totalCompletions");
+  const heatmapGrid = document.getElementById("heatmapGrid");
+  const heatmapMonthLabels = document.getElementById("heatmapMonthLabels");
 
-  dateLabel.textContent = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
+  if (dateLabel) {
+    dateLabel.textContent = new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
+  }
 
   // --- API layer ---
 
@@ -45,6 +55,14 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(`Failed to delete task: ${res.statusText}`);
       }
     },
+
+    async getHeatmap() {
+      const res = await fetch("/api/analytics/heatmap");
+      if (!res.ok) {
+        throw new Error(`Failed to fetch heatmap data: ${res.statusText}`);
+      }
+      return res.json();
+    },
   };
 
   // --- State ---
@@ -54,11 +72,18 @@ document.addEventListener("DOMContentLoaded", () => {
     filter: "all",
     view: "list",
     searchQuery: "",
+    page: window.location.hash === "#analytics" ? "analytics" : "tasks",
+    heatmap: null,
   };
 
   async function loadTasks() {
     state.tasks = await TaskAPI.getAll(state.filter);
     render();
+  }
+
+  async function loadHeatmap() {
+    state.heatmap = await TaskAPI.getHeatmap();
+    renderHeatmap();
   }
 
   // --- UI rendering ---
@@ -94,6 +119,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function render() {
+    if (state.page !== "tasks") {
+      return;
+    }
+
     const visibleTasks = getVisibleTasks();
     const count = visibleTasks.length;
     taskCount.textContent = `${count} task${count !== 1 ? "s" : ""}`;
@@ -144,6 +173,71 @@ document.addEventListener("DOMContentLoaded", () => {
       const category = String(task.category || "").toLowerCase();
       return title.includes(query) || category.includes(query);
     });
+  }
+
+  function getIntensityLevel(count, maxCount) {
+    if (count <= 0) return 0;
+    if (maxCount <= 1) return 2;
+    const ratio = count / maxCount;
+    if (ratio <= 0.25) return 1;
+    if (ratio <= 0.5) return 2;
+    if (ratio <= 0.75) return 3;
+    return 4;
+  }
+
+  function renderHeatmap() {
+    if (!state.heatmap) return;
+
+    const data = state.heatmap;
+    const days = Array.isArray(data.days) ? data.days : [];
+    const weekCount = Math.max(1, Math.ceil(days.length / 7));
+    const maxCount = days.reduce((max, day) => Math.max(max, day.count || 0), 0);
+
+    currentStreak.textContent = String(data.current_streak || 0);
+    longestStreak.textContent = String(data.longest_streak || 0);
+    totalCompletions.textContent = String(data.total_completions || 0);
+
+    heatmapGrid.innerHTML = "";
+    heatmapGrid.style.gridTemplateColumns = `repeat(${weekCount}, minmax(0, 1fr))`;
+    heatmapMonthLabels.style.gridTemplateColumns = `repeat(${weekCount}, minmax(0, 1fr))`;
+
+    days.forEach((day) => {
+      const count = Number(day.count) || 0;
+      const level = getIntensityLevel(count, maxCount);
+      const cell = document.createElement("span");
+      const date = new Date(`${day.date}T00:00:00`);
+      const formattedDate = date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+
+      cell.className = `heatmap-cell level-${level}`;
+      cell.title = `${formattedDate}: ${count} task${count === 1 ? "" : "s"} completed`;
+      cell.setAttribute("aria-label", cell.title);
+      heatmapGrid.appendChild(cell);
+    });
+
+    heatmapMonthLabels.innerHTML = "";
+    for (let weekIndex = 0; weekIndex < weekCount; weekIndex += 1) {
+      const monthLabel = document.createElement("span");
+      monthLabel.className = "heatmap-month-label";
+      const dayAtWeekStart = days[weekIndex * 7];
+      if (dayAtWeekStart) {
+        const weekMonth = new Date(`${dayAtWeekStart.date}T00:00:00`).toLocaleDateString(
+          "en-US",
+          { month: "short" },
+        );
+        const previousWeekDay = weekIndex > 0 ? days[(weekIndex - 1) * 7] : null;
+        const previousMonth = previousWeekDay
+          ? new Date(`${previousWeekDay.date}T00:00:00`).toLocaleDateString("en-US", {
+            month: "short",
+          })
+          : "";
+        monthLabel.textContent = weekIndex === 0 || weekMonth !== previousMonth ? weekMonth : "";
+      }
+      heatmapMonthLabels.appendChild(monthLabel);
+    }
   }
 
   let columnDropZonesSetup = false;
@@ -248,8 +342,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const newColumn = columnNode.cloneNode(true);
     columnNode.parentNode.replaceChild(newColumn, columnNode);
     
-    const bodyNode = newColumn.querySelector(`[data-column-body="${status}"]`);
-    
     newColumn.addEventListener("dragover", (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
@@ -329,6 +421,35 @@ document.addEventListener("DOMContentLoaded", () => {
     state.filter = filter;
   }
 
+  function setPage(page, updateHash = true) {
+    state.page = page;
+
+    tasksPage.classList.toggle("hidden", page !== "tasks");
+    analyticsPage.classList.toggle("hidden", page !== "analytics");
+
+    navLinks.forEach((link) => {
+      const isActive = link.dataset.pageLink === page;
+      link.classList.toggle("active", isActive);
+    });
+
+    if (updateHash) {
+      window.location.hash = page === "analytics" ? "analytics" : "tasks";
+    }
+
+    if (page === "analytics") {
+      if (state.heatmap) {
+        renderHeatmap();
+      } else {
+        loadHeatmap().catch((err) => {
+          showErrorFeedback(err.message);
+        });
+      }
+      return;
+    }
+
+    render();
+  }
+
   function setView(view) {
     state.view = view;
     const buttons = viewToggle.querySelectorAll(".view-toggle-btn");
@@ -345,6 +466,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Event listeners ---
+
+  navLinks.forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      setPage(link.dataset.pageLink);
+    });
+  });
+
+  window.addEventListener("hashchange", () => {
+    const nextPage = window.location.hash === "#analytics" ? "analytics" : "tasks";
+    setPage(nextPage, false);
+  });
 
   filters.addEventListener("click", (e) => {
     if (!e.target.matches(".filter-btn")) return;
@@ -364,5 +497,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Init ---
 
-  loadTasks();
+  setPage(state.page, false);
+  loadTasks().catch((err) => {
+    showErrorFeedback(err.message);
+  });
 });

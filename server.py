@@ -129,6 +129,47 @@ def generate_demo_data(conn):
         )
 
 
+def get_streak_stats(conn, today):
+    rows = conn.execute(
+        """
+        SELECT DISTINCT date(completed_at) AS completion_date
+        FROM tasks
+        WHERE status = 'done' AND completed_at IS NOT NULL
+        ORDER BY completion_date ASC
+        """
+    ).fetchall()
+    if not rows:
+        return 0, 0
+
+    completed_dates = set()
+    for row in rows:
+        completion_date = row["completion_date"]
+        if completion_date:
+            completed_dates.add(datetime.strptime(completion_date, "%Y-%m-%d").date())
+
+    if not completed_dates:
+        return 0, 0
+
+    current_streak = 0
+    cursor = today
+    while cursor in completed_dates:
+        current_streak += 1
+        cursor -= timedelta(days=1)
+
+    longest_streak = 0
+    run = 0
+    previous = None
+    for completion_date in sorted(completed_dates):
+        if previous and completion_date == previous + timedelta(days=1):
+            run += 1
+        else:
+            run = 1
+        longest_streak = max(longest_streak, run)
+        previous = completion_date
+
+    return current_streak, longest_streak
+
+
 # --- Static files ---
 
 @app.route("/")
@@ -150,6 +191,55 @@ def get_tasks():
         rows = conn.execute("SELECT * FROM tasks").fetchall()
     conn.close()
     return jsonify([row_to_dict(r) for r in rows])
+
+
+@app.route("/api/analytics/heatmap", methods=["GET"])
+def get_analytics_heatmap():
+    conn = get_db()
+    today = datetime.now(timezone.utc).date()
+    current_week_start = today - timedelta(days=today.weekday())
+    start_date = current_week_start - timedelta(weeks=11)
+    end_date = start_date + timedelta(days=83)
+
+    rows = conn.execute(
+        """
+        SELECT date(completed_at) AS completion_date, COUNT(*) AS completion_count
+        FROM tasks
+        WHERE status = 'done'
+          AND completed_at IS NOT NULL
+          AND date(completed_at) BETWEEN ? AND ?
+        GROUP BY date(completed_at)
+        """,
+        (start_date.isoformat(), end_date.isoformat()),
+    ).fetchall()
+
+    completion_by_date = {
+        row["completion_date"]: int(row["completion_count"]) for row in rows
+    }
+    days = []
+    total_completions = 0
+
+    cursor = start_date
+    while cursor <= end_date:
+        date_key = cursor.isoformat()
+        count = completion_by_date.get(date_key, 0)
+        total_completions += count
+        days.append({"date": date_key, "count": count})
+        cursor += timedelta(days=1)
+
+    current_streak, longest_streak = get_streak_stats(conn, today)
+    conn.close()
+
+    return jsonify(
+        {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "days": days,
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "total_completions": total_completions,
+        }
+    )
 
 
 @app.route("/api/tasks/<int:task_id>", methods=["PUT"])
