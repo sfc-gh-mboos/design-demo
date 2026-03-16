@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 import sqlite3
 import os
+import random
 from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__, static_folder=".", static_url_path="")
@@ -204,6 +205,215 @@ def delete_task(task_id):
     conn.commit()
     conn.close()
     return "", 204
+
+
+# --- Analytics API ---
+
+def _generate_analytics_data(cohort):
+    """
+    Generate deterministic dummy analytics data for a given cohort.
+    Uses hash-based seeding so each cohort gets consistent but distinct data.
+    This function is the swap-point for future Databricks integration.
+    """
+    # Use hash of cohort string as seed for deterministic randomness
+    cohort_hash = hash(cohort) % (2**31)
+    random.seed(cohort_hash)
+    
+    categories = ["Planning", "Design", "Engineering", "Operations"]
+    priorities = ["high", "medium", "low"]
+    
+    # Base values vary by cohort
+    base_completion = 0.65 + (cohort_hash % 30) / 100  # 65-95%
+    base_tasks_week = 15 + (cohort_hash % 20)  # 15-35 tasks
+    base_streak = 3 + (cohort_hash % 8)  # 3-10 days
+    
+    # Summary KPIs
+    completion_rate = round(base_completion * 100, 1)
+    tasks_this_week = base_tasks_week
+    streak_days = base_streak
+    high_priority_completion = round(min(95, base_completion * 100 + 10), 1)
+    avg_days_to_complete = round(2.5 + (cohort_hash % 10) / 5, 1)  # 2.5-4.5 days
+    weekly_velocity = round(tasks_this_week * base_completion)
+    
+    # Distribution by category
+    by_category = []
+    total_category_tasks = tasks_this_week * 4  # Rough estimate
+    category_weights = [0.25, 0.20, 0.35, 0.20]  # Planning, Design, Engineering, Operations
+    for i, cat in enumerate(categories):
+        total = int(total_category_tasks * category_weights[i])
+        completed = int(total * (base_completion + random.uniform(-0.1, 0.1)))
+        by_category.append({
+            "name": cat,
+            "total": max(1, total),
+            "completed": max(0, min(completed, total))
+        })
+    
+    # Distribution by priority
+    by_priority = []
+    priority_weights = [0.30, 0.45, 0.25]  # high, medium, low
+    for i, pri in enumerate(priorities):
+        count = int(total_category_tasks * priority_weights[i])
+        by_priority.append({
+            "name": pri,
+            "count": max(1, count)
+        })
+    
+    # Weekly trends (8 weeks)
+    base = datetime.now(timezone.utc)
+    weekly_progress = []
+    priority_focus = []
+    productivity_score = []
+    
+    for week_offset in range(7, -1, -1):
+        week_start = base - timedelta(weeks=week_offset)
+        week_label = week_start.strftime("%Y-%m-%d")
+        
+        # Weekly progress trend (improving over time)
+        trend_factor = 1.0 + (7 - week_offset) * 0.05
+        created = int(base_tasks_week * trend_factor)
+        completed = int(created * (base_completion + (7 - week_offset) * 0.02))
+        weekly_progress.append({
+            "week": week_label,
+            "created": max(1, created),
+            "completed": max(0, min(completed, created))
+        })
+        
+        # Priority focus (shifts over time)
+        high_pct = 0.25 + (week_offset % 3) * 0.05
+        medium_pct = 0.50 - (week_offset % 2) * 0.03
+        low_pct = 1.0 - high_pct - medium_pct
+        priority_focus.append({
+            "week": week_label,
+            "high": int(created * high_pct),
+            "medium": int(created * medium_pct),
+            "low": int(created * low_pct)
+        })
+        
+        # Productivity score (0-100 scale)
+        score = min(100, (base_completion * 100) + (7 - week_offset) * 2 + random.uniform(-3, 3))
+        productivity_score.append({
+            "week": week_label,
+            "score": round(score, 1)
+        })
+    
+    return {
+        "summary": {
+            "completion_rate": completion_rate,
+            "tasks_this_week": tasks_this_week,
+            "streak_days": streak_days,
+            "high_priority_completion": high_priority_completion,
+            "avg_days_to_complete": avg_days_to_complete,
+            "weekly_velocity": weekly_velocity
+        },
+        "distribution": {
+            "by_category": by_category,
+            "by_priority": by_priority
+        },
+        "trends": {
+            "weekly_progress": weekly_progress,
+            "priority_focus": priority_focus,
+            "productivity_score": productivity_score
+        }
+    }
+
+
+@app.route("/api/analytics/summary", methods=["GET"])
+def analytics_summary():
+    cohort = request.args.get("cohort", "all")
+    valid_cohorts = ["all", "power_users", "new_users", "enterprise", "team_alpha", "team_beta"]
+    if cohort not in valid_cohorts:
+        cohort = "all"
+    
+    data = _generate_analytics_data(cohort)
+    return jsonify(data["summary"])
+
+
+@app.route("/api/analytics/distribution", methods=["GET"])
+def analytics_distribution():
+    cohort = request.args.get("cohort", "all")
+    valid_cohorts = ["all", "power_users", "new_users", "enterprise", "team_alpha", "team_beta"]
+    if cohort not in valid_cohorts:
+        cohort = "all"
+    
+    data = _generate_analytics_data(cohort)
+    return jsonify(data["distribution"])
+
+
+@app.route("/api/analytics/trends", methods=["GET"])
+def analytics_trends():
+    cohort = request.args.get("cohort", "all")
+    valid_cohorts = ["all", "power_users", "new_users", "enterprise", "team_alpha", "team_beta"]
+    if cohort not in valid_cohorts:
+        cohort = "all"
+    
+    data = _generate_analytics_data(cohort)
+    return jsonify(data["trends"])
+
+
+@app.route("/analytics")
+def analytics_page():
+    return send_from_directory(".", "analytics.html")
+
+
+@app.route("/heatmap")
+def heatmap_page():
+    return send_from_directory(".", "heatmap.html")
+
+
+@app.route("/api/analytics/heatmap", methods=["GET"])
+def analytics_heatmap():
+    weeks = request.args.get("weeks", 12, type=int)
+    weeks = max(1, min(weeks, 52))
+
+    conn = get_db()
+    end_date = datetime.now(timezone.utc).date()
+    start_date = end_date - timedelta(weeks=weeks)
+
+    rows = conn.execute(
+        """SELECT DATE(completed_at) as day, COUNT(*) as count
+           FROM tasks
+           WHERE completed_at IS NOT NULL
+             AND DATE(completed_at) >= ?
+             AND DATE(completed_at) <= ?
+           GROUP BY DATE(completed_at)
+           ORDER BY day""",
+        (start_date.isoformat(), end_date.isoformat()),
+    ).fetchall()
+    conn.close()
+
+    counts_by_date = {row["day"]: row["count"] for row in rows}
+
+    days = []
+    d = start_date
+    while d <= end_date:
+        iso = d.isoformat()
+        days.append({"date": iso, "count": counts_by_date.get(iso, 0)})
+        d += timedelta(days=1)
+
+    total = sum(entry["count"] for entry in days)
+
+    current_streak = 0
+    for entry in reversed(days):
+        if entry["count"] > 0:
+            current_streak += 1
+        else:
+            break
+
+    longest_streak = 0
+    streak = 0
+    for entry in days:
+        if entry["count"] > 0:
+            streak += 1
+            longest_streak = max(longest_streak, streak)
+        else:
+            streak = 0
+
+    return jsonify({
+        "days": days,
+        "current_streak": current_streak,
+        "longest_streak": longest_streak,
+        "total": total,
+    })
 
 
 if __name__ == "__main__":
