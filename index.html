@@ -15,68 +15,101 @@
         <span class="logo-text">Taskflow</span>
       </div>
       <nav class="topbar-nav">
-        <a href="/" class="nav-link active">Tasks</a>
+        <a href="#tasks" class="nav-link active" data-page-link="tasks">Tasks</a>
+        <a href="#analytics" class="nav-link" data-page-link="analytics">Analytics</a>
       </nav>
     </div>
   </header>
 
   <main class="container">
-    <section class="hero">
-      <h1>Daily Tasks</h1>
-      <p class="subtitle">Stay on track. One task at a time. <span id="dateLabel"></span></p>
-    </section>
+    <section id="tasksPage">
+      <section class="hero">
+        <h1>Daily Tasks</h1>
+        <p class="subtitle">Stay on track. One task at a time. <span id="dateLabel"></span></p>
+      </section>
 
-    <div class="toolbar">
-      <div class="toolbar-left">
-        <div class="filters" id="filters">
-          <button class="filter-btn active" data-filter="all">All</button>
-          <button class="filter-btn" data-filter="todo">To Do</button>
-          <button class="filter-btn" data-filter="in-progress">In Progress</button>
-          <button class="filter-btn" data-filter="done">Done</button>
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <div class="filters" id="filters">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="todo">To Do</button>
+            <button class="filter-btn" data-filter="in-progress">In Progress</button>
+            <button class="filter-btn" data-filter="done">Done</button>
+          </div>
+          <input
+            id="searchInput"
+            class="search-input"
+            type="search"
+            placeholder="Search tasks"
+            aria-label="Search tasks"
+          >
         </div>
-        <input
-          id="searchInput"
-          class="search-input"
-          type="search"
-          placeholder="Search tasks"
-          aria-label="Search tasks"
-        >
+        <div class="view-toggle" id="viewToggle" role="tablist" aria-label="Task view">
+          <button class="view-toggle-btn active" type="button" data-view="list" role="tab" aria-selected="true">List</button>
+          <button class="view-toggle-btn" type="button" data-view="board" role="tab" aria-selected="false">Board</button>
+        </div>
+        <span class="task-count" id="taskCount"></span>
       </div>
-      <div class="view-toggle" id="viewToggle" role="tablist" aria-label="Task view">
-        <button class="view-toggle-btn active" type="button" data-view="list" role="tab" aria-selected="true">List</button>
-        <button class="view-toggle-btn" type="button" data-view="board" role="tab" aria-selected="false">Board</button>
-      </div>
-      <span class="task-count" id="taskCount"></span>
-    </div>
 
-    <section class="list-view" id="listView" aria-label="Task list">
-      <ul class="task-list" id="taskList"></ul>
+      <section class="list-view" id="listView" aria-label="Task list">
+        <ul class="task-list" id="taskList"></ul>
+      </section>
+
+      <section class="board-view hidden" id="boardView" aria-label="Kanban board">
+        <article class="board-column" data-board-column="todo">
+          <header class="board-column-header">
+            <h2 class="board-column-title">To Do</h2>
+            <span class="board-column-count" data-column-count="todo">0</span>
+          </header>
+          <div class="board-column-body" data-column-body="todo"></div>
+        </article>
+
+        <article class="board-column" data-board-column="in-progress">
+          <header class="board-column-header">
+            <h2 class="board-column-title">In Progress</h2>
+            <span class="board-column-count" data-column-count="in-progress">0</span>
+          </header>
+          <div class="board-column-body" data-column-body="in-progress"></div>
+        </article>
+
+        <article class="board-column" data-board-column="done">
+          <header class="board-column-header">
+            <h2 class="board-column-title">Done</h2>
+            <span class="board-column-count" data-column-count="done">0</span>
+          </header>
+          <div class="board-column-body" data-column-body="done"></div>
+        </article>
+      </section>
     </section>
 
-    <section class="board-view hidden" id="boardView" aria-label="Kanban board">
-      <article class="board-column" data-board-column="todo">
-        <header class="board-column-header">
-          <h2 class="board-column-title">To Do</h2>
-          <span class="board-column-count" data-column-count="todo">0</span>
-        </header>
-        <div class="board-column-body" data-column-body="todo"></div>
-      </article>
+    <section id="analyticsPage" class="hidden" aria-label="Activity heatmap page">
+      <section class="hero">
+        <h1>Activity Heatmap</h1>
+        <p class="subtitle">Daily completion intensity over the last 12 weeks.</p>
+      </section>
 
-      <article class="board-column" data-board-column="in-progress">
-        <header class="board-column-header">
-          <h2 class="board-column-title">In Progress</h2>
-          <span class="board-column-count" data-column-count="in-progress">0</span>
-        </header>
-        <div class="board-column-body" data-column-body="in-progress"></div>
-      </article>
+      <section class="heatmap-summary" aria-label="Heatmap summary statistics">
+        <article class="summary-card">
+          <span class="summary-label">Current Streak</span>
+          <span class="summary-value" id="currentStreak">0</span>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">Longest Streak</span>
+          <span class="summary-value" id="longestStreak">0</span>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">Total Completions</span>
+          <span class="summary-value" id="totalCompletions">0</span>
+        </article>
+      </section>
 
-      <article class="board-column" data-board-column="done">
-        <header class="board-column-header">
-          <h2 class="board-column-title">Done</h2>
-          <span class="board-column-count" data-column-count="done">0</span>
-        </header>
-        <div class="board-column-body" data-column-body="done"></div>
-      </article>
+      <section class="heatmap-wrapper">
+        <div class="heatmap-y-axis" id="heatmapYAxis" aria-hidden="true"></div>
+        <div class="heatmap-main">
+          <div class="heatmap-months" id="heatmapMonths" aria-hidden="true"></div>
+          <div class="heatmap-grid" id="heatmapGrid" role="grid" aria-label="Daily completion heatmap"></div>
+        </div>
+      </section>
     </section>
   </main>
 
