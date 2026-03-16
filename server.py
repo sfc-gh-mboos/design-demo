@@ -68,6 +68,36 @@ def normalize_priority(priority):
     return None
 
 
+def build_heatmap_days(start_date, end_date, counts_by_date):
+    days = []
+    current = start_date
+    while current <= end_date:
+        day_str = current.isoformat()
+        days.append({"date": day_str, "count": int(counts_by_date.get(day_str, 0))})
+        current += timedelta(days=1)
+    return days
+
+
+def compute_streaks(days):
+    current_streak = 0
+    for day in reversed(days):
+        if day["count"] > 0:
+            current_streak += 1
+            continue
+        break
+
+    longest_streak = 0
+    running = 0
+    for day in days:
+        if day["count"] > 0:
+            running += 1
+            longest_streak = max(longest_streak, running)
+        else:
+            running = 0
+
+    return current_streak, longest_streak
+
+
 def generate_demo_data(conn):
     """Create ~60 tasks spanning the past 8 weeks with realistic patterns."""
     import random
@@ -204,6 +234,46 @@ def delete_task(task_id):
     conn.commit()
     conn.close()
     return "", 204
+
+
+@app.route("/api/analytics/heatmap", methods=["GET"])
+def get_analytics_heatmap():
+    end_date = datetime.now(timezone.utc).date()
+    start_date = end_date - timedelta(days=83)
+    start_str = start_date.isoformat()
+    end_str = end_date.isoformat()
+
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT date(completed_at) AS day, COUNT(*) AS completions
+        FROM tasks
+        WHERE status = 'done'
+          AND completed_at IS NOT NULL
+          AND date(completed_at) BETWEEN ? AND ?
+        GROUP BY date(completed_at)
+        """,
+        (start_str, end_str),
+    ).fetchall()
+    conn.close()
+
+    counts_by_date = {row["day"]: row["completions"] for row in rows if row["day"]}
+    days = build_heatmap_days(start_date, end_date, counts_by_date)
+    current_streak, longest_streak = compute_streaks(days)
+    total_completions = sum(day["count"] for day in days)
+
+    return jsonify(
+        {
+            "start_date": start_str,
+            "end_date": end_str,
+            "days": days,
+            "summary": {
+                "current_streak": current_streak,
+                "longest_streak": longest_streak,
+                "total_completions": total_completions,
+            },
+        }
+    )
 
 
 if __name__ == "__main__":

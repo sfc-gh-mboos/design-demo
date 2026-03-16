@@ -34,3 +34,24 @@ def test_index_includes_board_shell_columns(ui_client):
     assert 'data-board-column="todo"' in html
     assert 'data-board-column="in-progress"' in html
     assert 'data-board-column="done"' in html
+
+
+def test_index_includes_analytics_nav_link(ui_client):
+    response = ui_client.get("/")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'data-page-link="analytics"' in html
+    assert ">Analytics<" in html
+
+
+def test_index_includes_analytics_page_shell(ui_client):
+    response = ui_client.get("/")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'id="analyticsPage"' in html
+    assert 'id="heatmapGrid"' in html
+    assert 'id="currentStreak"' in html
+    assert 'id="longestStreak"' in html
+    assert 'id="totalCompletions"' in html
