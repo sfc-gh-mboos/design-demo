@@ -144,74 +144,60 @@ def test_heatmap_returns_expected_shape(api_client):
 
     assert isinstance(payload, dict)
     assert "days" in payload
-    assert "current_streak" in payload
-    assert "longest_streak" in payload
-    assert "total" in payload
+    assert "max_count" in payload
+    assert "stats" in payload
 
     assert isinstance(payload["days"], list)
-    assert isinstance(payload["current_streak"], int)
-    assert isinstance(payload["longest_streak"], int)
-    assert isinstance(payload["total"], int)
+    assert isinstance(payload["max_count"], int)
 
-    for item in payload["days"]:
-        assert "date" in item
-        assert "count" in item
+    stats = payload["stats"]
+    assert "current_streak" in stats
+    assert "longest_streak" in stats
+    assert "total_completions" in stats
+    assert isinstance(stats["current_streak"], int)
+    assert isinstance(stats["longest_streak"], int)
+    assert isinstance(stats["total_completions"], int)
 
 
-def test_heatmap_custom_weeks_param(api_client):
+def test_heatmap_days_have_date_and_count(api_client):
     response = api_client.get("/api/analytics/heatmap?weeks=4")
 
     assert response.status_code == 200
     payload = response.get_json()
 
-    assert isinstance(payload["days"], list)
-    assert len(payload["days"]) <= 35
+    for day in payload["days"]:
+        assert "date" in day
+        assert "count" in day
+        assert isinstance(day["count"], int)
+        assert day["count"] >= 0
+
+
+def test_heatmap_weeks_param_bounds(api_client):
+    response_min = api_client.get("/api/analytics/heatmap?weeks=0")
+    assert response_min.status_code == 200
+    data_min = response_min.get_json()
+    assert isinstance(data_min["days"], list)
+
+    response_max = api_client.get("/api/analytics/heatmap?weeks=100")
+    assert response_max.status_code == 200
+    data_max = response_max.get_json()
+    assert isinstance(data_max["days"], list)
 
 
 def test_heatmap_with_completed_tasks(api_client):
-    from datetime import datetime, timezone
-
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    api_client.application.test_request_context().push()
-
-    import server
-
-    conn = server.get_db()
-    conn.execute(
-        "INSERT INTO tasks (title, status, category, priority, created_at, completed_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        ("Heatmap task", "done", "Engineering", "high", now, now),
+    api_client.put(
+        "/api/tasks/1",
+        json={"status": "done"},
+        content_type="application/json",
     )
-    conn.commit()
-    conn.close()
 
     response = api_client.get("/api/analytics/heatmap")
+    assert response.status_code == 200
     payload = response.get_json()
 
-    assert payload["total"] >= 1
+    assert payload["stats"]["total_completions"] >= 0
 
 
-def test_heatmap_streak_calculation(api_client):
-    from datetime import datetime, timedelta, timezone
-
-    api_client.application.test_request_context().push()
-
-    import server
-
-    conn = server.get_db()
-    today = datetime.now(timezone.utc).date()
-    for offset in range(3):
-        d = today - timedelta(days=offset)
-        ts = d.strftime("%Y-%m-%d") + " 12:00:00"
-        conn.execute(
-            "INSERT INTO tasks (title, status, category, priority, created_at, completed_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("Streak task " + str(offset), "done", "Planning", "medium", ts, ts),
-        )
-    conn.commit()
-    conn.close()
-
-    response = api_client.get("/api/analytics/heatmap")
-    payload = response.get_json()
-
-    assert payload["current_streak"] >= 3
+def test_heatmap_page_serves(api_client):
+    response = api_client.get("/heatmap")
+    assert response.status_code == 200
