@@ -83,32 +83,47 @@
     </section>
 
     <section id="analyticsPage" class="hidden" aria-label="Activity heatmap page">
-      <section class="hero">
-        <h1>Activity Heatmap</h1>
-        <p class="subtitle">Daily completion intensity over the last 12 weeks.</p>
-      </section>
+      <section class="analytics-shell">
+        <h2 class="analytics-kicker">Heatmap</h2>
+        <article class="analytics-card">
+          <h1 class="analytics-title">Activity Heatmap</h1>
 
-      <section class="heatmap-summary" aria-label="Heatmap summary statistics">
-        <article class="summary-card">
-          <span class="summary-label">Current Streak</span>
-          <span class="summary-value" id="currentStreak">0</span>
-        </article>
-        <article class="summary-card">
-          <span class="summary-label">Longest Streak</span>
-          <span class="summary-value" id="longestStreak">0</span>
-        </article>
-        <article class="summary-card">
-          <span class="summary-label">Total Completions</span>
-          <span class="summary-value" id="totalCompletions">0</span>
-        </article>
-      </section>
+          <section class="heatmap-summary" aria-label="Heatmap summary statistics">
+            <article class="summary-card">
+              <span class="summary-label">Current Streak</span>
+              <span class="summary-value"><span class="summary-number" id="currentStreak">0</span><span class="summary-unit">days</span></span>
+            </article>
+            <article class="summary-card">
+              <span class="summary-label">Longest Streak</span>
+              <span class="summary-value"><span class="summary-number" id="longestStreak">0</span><span class="summary-unit">days</span></span>
+            </article>
+            <article class="summary-card">
+              <span class="summary-label">Total Completions</span>
+              <span class="summary-value"><span class="summary-number" id="totalCompletions">0</span></span>
+            </article>
+          </section>
 
-      <section class="heatmap-wrapper">
-        <div class="heatmap-y-axis" id="heatmapYAxis" aria-hidden="true"></div>
-        <div class="heatmap-main">
-          <div class="heatmap-months" id="heatmapMonths" aria-hidden="true"></div>
-          <div class="heatmap-grid" id="heatmapGrid" role="grid" aria-label="Daily completion heatmap"></div>
-        </div>
+          <section class="heatmap-wrapper">
+            <div class="heatmap-main">
+              <div class="heatmap-months" id="heatmapMonths" aria-hidden="true"></div>
+              <div class="heatmap-layout">
+                <div class="heatmap-y-axis" id="heatmapYAxis" aria-hidden="true"></div>
+                <div class="heatmap-grid" id="heatmapGrid" role="grid" aria-label="Daily completion heatmap"></div>
+              </div>
+            </div>
+
+            <div class="heatmap-legend" aria-hidden="true">
+              <span>Less</span>
+              <div class="heatmap-legend-swatch level-0"></div>
+              <div class="heatmap-legend-swatch level-1"></div>
+              <div class="heatmap-legend-swatch level-2"></div>
+              <div class="heatmap-legend-swatch level-3"></div>
+              <div class="heatmap-legend-swatch level-4"></div>
+              <div class="heatmap-legend-swatch level-5"></div>
+              <span>More</span>
+            </div>
+          </section>
+      </article>
       </section>
     </section>
   </main>

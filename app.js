@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const heatmapMonths = document.getElementById("heatmapMonths");
   const heatmapYAxis = document.getElementById("heatmapYAxis");
   const heatmapGrid = document.getElementById("heatmapGrid");
+  const container = document.querySelector(".container");
 
   dateLabel.textContent = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -73,7 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const PRIORITY_LABELS = { high: "High", medium: "Med", low: "Low" };
   const BOARD_STATUSES = ["todo", "in-progress", "done"];
-  const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const WEEKDAY_LABELS = ["Mon", "", "Wed", "", "Fri", "", "Sun"];
   const STATUS_CYCLE = { todo: "in-progress", "in-progress": "done", done: "todo" };
 
   async function loadTasks() {
@@ -154,10 +155,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function heatmapLevel(count, maxCount) {
     if (count <= 0 || maxCount <= 0) return 0;
     const ratio = count / maxCount;
-    if (ratio <= 0.25) return 1;
-    if (ratio <= 0.5) return 2;
-    if (ratio <= 0.75) return 3;
-    return 4;
+    if (ratio <= 0.2) return 1;
+    if (ratio <= 0.4) return 2;
+    if (ratio <= 0.6) return 3;
+    if (ratio <= 0.8) return 4;
+    return 5;
   }
 
   function groupWeeks(days) {
@@ -206,17 +208,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     heatmapMonths.innerHTML = "";
     heatmapMonths.style.gridTemplateColumns = `repeat(${weeks.length}, 1fr)`;
+    let previousMonth = "";
     weeks.forEach((week, idx) => {
       const monthNode = document.createElement("span");
       monthNode.className = "heatmap-month-label";
       monthNode.style.gridColumn = String(idx + 1);
-      const monthStart = week.days.find((entry) => entry && entry.date.endsWith("-01"));
-      if (monthStart) {
-        const monthDate = new Date(`${monthStart.date}T00:00:00`);
-        monthNode.textContent = monthDate.toLocaleDateString("en-US", { month: "short" });
-      } else {
-        monthNode.textContent = "";
-      }
+      const monthAnchor = week.days.find((entry) => entry) || null;
+      if (!monthAnchor) return;
+      const monthDate = new Date(`${monthAnchor.date}T00:00:00`);
+      const monthText = monthDate.toLocaleDateString("en-US", { month: "short" });
+      monthNode.textContent = monthText !== previousMonth ? monthText : "";
+      previousMonth = monthText;
       heatmapMonths.appendChild(monthNode);
     });
 
@@ -240,8 +242,6 @@ document.addEventListener("DOMContentLoaded", () => {
           cell.title = `${getDateLabel(date)}: ${count} completed ${unit}`;
           cell.dataset.date = date;
           cell.dataset.count = String(count);
-        } else {
-          cell.title = "No tracked day";
         }
         heatmapGrid.appendChild(cell);
       }
@@ -448,6 +448,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const showTasks = nextPage === "tasks";
     tasksPage.classList.toggle("hidden", !showTasks);
     analyticsPage.classList.toggle("hidden", showTasks);
+    container.classList.toggle("analytics-mode", !showTasks);
 
     if (!showTasks) {
       try {
