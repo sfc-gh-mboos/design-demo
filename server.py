@@ -402,6 +402,8 @@ def analytics_heatmap():
     current_streak = 0
     d = today
     completed_set = set(completed_dates)
+    if d.isoformat() not in completed_set:
+        d -= timedelta(days=1)
     while d.isoformat() in completed_set:
         current_streak += 1
         d -= timedelta(days=1)
