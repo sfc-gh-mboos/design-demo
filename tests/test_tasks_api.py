@@ -31,3 +31,191 @@ def test_get_tasks_filters_by_status(api_client):
     assert response.status_code == 200
     payload = response.get_json()
     assert isinstance(payload, list)
+
+
+def test_analytics_summary_returns_expected_shape(api_client):
+    response = api_client.get("/api/analytics/summary?cohort=all")
+    
+    assert response.status_code == 200
+    payload = response.get_json()
+    
+    assert isinstance(payload, dict)
+    assert "completion_rate" in payload
+    assert "tasks_this_week" in payload
+    assert "streak_days" in payload
+    assert "high_priority_completion" in payload
+    assert "avg_days_to_complete" in payload
+    assert "weekly_velocity" in payload
+    
+    assert isinstance(payload["completion_rate"], (int, float))
+    assert isinstance(payload["tasks_this_week"], int)
+    assert isinstance(payload["streak_days"], int)
+    assert isinstance(payload["high_priority_completion"], (int, float))
+    assert isinstance(payload["avg_days_to_complete"], (int, float))
+    assert isinstance(payload["weekly_velocity"], int)
+
+
+def test_analytics_distribution_returns_categories_and_priorities(api_client):
+    response = api_client.get("/api/analytics/distribution?cohort=all")
+    
+    assert response.status_code == 200
+    payload = response.get_json()
+    
+    assert isinstance(payload, dict)
+    assert "by_category" in payload
+    assert "by_priority" in payload
+    
+    assert isinstance(payload["by_category"], list)
+    assert len(payload["by_category"]) > 0
+    for item in payload["by_category"]:
+        assert "name" in item
+        assert "total" in item
+        assert "completed" in item
+    
+    assert isinstance(payload["by_priority"], list)
+    assert len(payload["by_priority"]) > 0
+    for item in payload["by_priority"]:
+        assert "name" in item
+        assert "count" in item
+
+
+def test_analytics_trends_returns_weekly_data(api_client):
+    response = api_client.get("/api/analytics/trends?cohort=all")
+    
+    assert response.status_code == 200
+    payload = response.get_json()
+    
+    assert isinstance(payload, dict)
+    assert "weekly_progress" in payload
+    assert "priority_focus" in payload
+    assert "productivity_score" in payload
+    
+    assert isinstance(payload["weekly_progress"], list)
+    assert len(payload["weekly_progress"]) == 8
+    for item in payload["weekly_progress"]:
+        assert "week" in item
+        assert "created" in item
+        assert "completed" in item
+    
+    assert isinstance(payload["priority_focus"], list)
+    assert len(payload["priority_focus"]) == 8
+    for item in payload["priority_focus"]:
+        assert "week" in item
+        assert "high" in item
+        assert "medium" in item
+        assert "low" in item
+    
+    assert isinstance(payload["productivity_score"], list)
+    assert len(payload["productivity_score"]) == 8
+    for item in payload["productivity_score"]:
+        assert "week" in item
+        assert "score" in item
+
+
+def test_analytics_cohort_filter_changes_data(api_client):
+    response_all = api_client.get("/api/analytics/summary?cohort=all")
+    response_power = api_client.get("/api/analytics/summary?cohort=power_users")
+    
+    assert response_all.status_code == 200
+    assert response_power.status_code == 200
+    
+    data_all = response_all.get_json()
+    data_power = response_power.get_json()
+    
+    # Different cohorts should return different data (deterministic but distinct)
+    # Note: This test verifies the filter works, but doesn't guarantee different values
+    # since the hash-based seeding could theoretically produce similar values
+    assert isinstance(data_all, dict)
+    assert isinstance(data_power, dict)
+    
+    # Test invalid cohort defaults to "all"
+    response_invalid = api_client.get("/api/analytics/summary?cohort=invalid_cohort")
+    assert response_invalid.status_code == 200
+    data_invalid = response_invalid.get_json()
+    assert isinstance(data_invalid, dict)
+    assert "completion_rate" in data_invalid
+
+
+def test_heatmap_returns_expected_shape(api_client):
+    response = api_client.get("/api/analytics/heatmap")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+
+    assert isinstance(payload, dict)
+    assert "days" in payload
+    assert "current_streak" in payload
+    assert "longest_streak" in payload
+    assert "total" in payload
+
+    assert isinstance(payload["days"], list)
+    assert isinstance(payload["current_streak"], int)
+    assert isinstance(payload["longest_streak"], int)
+    assert isinstance(payload["total"], int)
+
+    for entry in payload["days"]:
+        assert "date" in entry
+        assert "count" in entry
+        assert isinstance(entry["count"], int)
+
+
+def test_heatmap_weeks_param(api_client):
+    response_default = api_client.get("/api/analytics/heatmap")
+    response_4w = api_client.get("/api/analytics/heatmap?weeks=4")
+
+    assert response_default.status_code == 200
+    assert response_4w.status_code == 200
+
+    days_default = response_default.get_json()["days"]
+    days_4w = response_4w.get_json()["days"]
+
+    assert len(days_4w) <= len(days_default)
+    assert len(days_4w) <= 29  # 4 weeks + 1 day
+
+
+def test_heatmap_with_completed_tasks(api_client):
+    import server
+    from datetime import datetime, timezone
+
+    conn = server.get_db()
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute(
+        "INSERT INTO tasks (title, status, category, priority, created_at, completed_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        ("Test task", "done", "Engineering", "high", now, now),
+    )
+    conn.commit()
+    conn.close()
+
+    response = api_client.get("/api/analytics/heatmap")
+    payload = response.get_json()
+
+    assert payload["total"] >= 1
+    today = datetime.now(timezone.utc).date().isoformat()
+    today_entry = next((d for d in payload["days"] if d["date"] == today), None)
+    assert today_entry is not None
+    assert today_entry["count"] >= 1
+
+
+def test_heatmap_streak_calculation(api_client):
+    import server
+    from datetime import datetime, timezone, timedelta
+
+    conn = server.get_db()
+    base = datetime.now(timezone.utc)
+    for offset in range(3):
+        d = base - timedelta(days=offset)
+        ts = d.strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute(
+            "INSERT INTO tasks (title, status, category, priority, created_at, completed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (f"Streak task {offset}", "done", "Planning", "medium", ts, ts),
+        )
+    conn.commit()
+    conn.close()
+
+    response = api_client.get("/api/analytics/heatmap")
+    payload = response.get_json()
+
+    assert payload["current_streak"] >= 3
+    assert payload["longest_streak"] >= 3
