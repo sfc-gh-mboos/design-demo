@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const topbarNav = document.querySelector(".topbar-nav");
   const filters = document.getElementById("filters");
   const viewToggle = document.getElementById("viewToggle");
   const searchInput = document.getElementById("searchInput");
@@ -7,6 +8,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const boardView = document.getElementById("boardView");
   const taskCount = document.getElementById("taskCount");
   const dateLabel = document.getElementById("dateLabel");
+  const tasksPanel = document.getElementById("tasksPanel");
+  const analyticsPanel = document.getElementById("analyticsPanel");
+  const heatmapGrid = document.getElementById("heatmapGrid");
+  const heatmapMonths = document.getElementById("heatmapMonths");
+  const currentStreak = document.getElementById("currentStreak");
+  const longestStreak = document.getElementById("longestStreak");
+  const totalCompletions = document.getElementById("totalCompletions");
 
   dateLabel.textContent = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -45,6 +53,14 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(`Failed to delete task: ${res.statusText}`);
       }
     },
+
+    async getHeatmap() {
+      const res = await fetch("/api/analytics/heatmap");
+      if (!res.ok) {
+        throw new Error(`Failed to fetch heatmap data: ${res.statusText}`);
+      }
+      return res.json();
+    },
   };
 
   // --- State ---
@@ -54,11 +70,20 @@ document.addEventListener("DOMContentLoaded", () => {
     filter: "all",
     view: "list",
     searchQuery: "",
+    page: "tasks",
+    heatmap: null,
   };
 
   async function loadTasks() {
     state.tasks = await TaskAPI.getAll(state.filter);
     render();
+  }
+
+  async function loadHeatmap() {
+    state.heatmap = await TaskAPI.getHeatmap();
+    if (state.page === "analytics") {
+      renderHeatmap();
+    }
   }
 
   // --- UI rendering ---
@@ -94,6 +119,15 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function render() {
+    const showTasks = state.page === "tasks";
+    tasksPanel.classList.toggle("hidden", !showTasks);
+    analyticsPanel.classList.toggle("hidden", showTasks);
+
+    if (!showTasks) {
+      renderHeatmap();
+      return;
+    }
+
     const visibleTasks = getVisibleTasks();
     const count = visibleTasks.length;
     taskCount.textContent = `${count} task${count !== 1 ? "s" : ""}`;
@@ -109,6 +143,92 @@ document.addEventListener("DOMContentLoaded", () => {
     boardView.classList.add("hidden");
     taskList.innerHTML = "";
     visibleTasks.forEach((task) => taskList.appendChild(renderTask(task)));
+  }
+
+  function renderHeatmap() {
+    const data = state.heatmap;
+    if (!data) {
+      currentStreak.textContent = "0";
+      longestStreak.textContent = "0";
+      totalCompletions.textContent = "0";
+      heatmapGrid.innerHTML = "";
+      heatmapMonths.innerHTML = "";
+      return;
+    }
+
+    const summary = data.summary || {};
+    currentStreak.textContent = String(summary.current_streak || 0);
+    longestStreak.textContent = String(summary.longest_streak || 0);
+    totalCompletions.textContent = String(summary.total_completions || 0);
+
+    const dailyCounts = Array.isArray(data.daily_counts) ? data.daily_counts : [];
+    if (!dailyCounts.length) {
+      heatmapGrid.innerHTML = "";
+      heatmapMonths.innerHTML = "";
+      return;
+    }
+
+    const weeks = [];
+    for (let i = 0; i < dailyCounts.length; i += 7) {
+      weeks.push(dailyCounts.slice(i, i + 7));
+    }
+
+    const maxCount = Math.max(0, ...dailyCounts.map((entry) => Number(entry.count) || 0));
+    const today = data.today || "";
+
+    heatmapGrid.innerHTML = "";
+    heatmapMonths.innerHTML = "";
+    heatmapGrid.style.setProperty("--heatmap-columns", String(weeks.length));
+    heatmapMonths.style.setProperty("--heatmap-columns", String(weeks.length));
+
+    let previousMonthLabel = "";
+    weeks.forEach((week) => {
+      const monthLabel = formatMonth(week[0]?.date);
+      const labelNode = document.createElement("span");
+      labelNode.className = "heatmap-month-label";
+      labelNode.textContent = monthLabel !== previousMonthLabel ? monthLabel : "";
+      previousMonthLabel = monthLabel;
+      heatmapMonths.appendChild(labelNode);
+    });
+
+    weeks.forEach((week) => {
+      week.forEach((day) => {
+        const count = Number(day.count) || 0;
+        const date = day.date;
+        const isFuture = today && date > today;
+        const cell = document.createElement("div");
+        cell.className = "heatmap-cell";
+        if (isFuture) {
+          cell.classList.add("future");
+        }
+        cell.setAttribute("role", "gridcell");
+        cell.title = `${formatDate(date)}: ${count} task${count === 1 ? "" : "s"} completed`;
+
+        if (count === 0 || isFuture) {
+          cell.style.backgroundColor = "var(--card)";
+        } else {
+          const opacity = maxCount > 0 ? 0.2 + (count / maxCount) * 0.8 : 0.2;
+          cell.style.backgroundColor = `rgba(245, 78, 0, ${Math.min(opacity, 1).toFixed(2)})`;
+        }
+        heatmapGrid.appendChild(cell);
+      });
+    });
+  }
+
+  function formatDate(dateString) {
+    if (!dateString) return "";
+    return new Date(`${dateString}T00:00:00Z`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  function formatMonth(dateString) {
+    if (!dateString) return "";
+    return new Date(`${dateString}T00:00:00Z`).toLocaleDateString("en-US", {
+      month: "short",
+    });
   }
 
   function renderBoardTask(task) {
@@ -198,6 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function cycleStatus(task) {
     const nextStatus = STATUS_CYCLE[task.status];
     await TaskAPI.update(task.id, { status: nextStatus });
+    state.heatmap = null;
     await loadTasks();
   }
 
@@ -289,6 +410,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (response.error) {
           throw new Error(response.error);
         }
+        state.heatmap = null;
         // Refresh to ensure consistency with server
         await loadTasks();
       } catch (error) {
@@ -344,6 +466,20 @@ document.addEventListener("DOMContentLoaded", () => {
     render();
   }
 
+  function setPage(page) {
+    state.page = page;
+    const navLinks = topbarNav.querySelectorAll("[data-nav-view]");
+    navLinks.forEach((link) => {
+      link.classList.toggle("active", link.dataset.navView === page);
+    });
+    render();
+    if (page === "analytics" && !state.heatmap) {
+      loadHeatmap().catch(() => {
+        showErrorFeedback("Failed to load heatmap data. Please try again.");
+      });
+    }
+  }
+
   // --- Event listeners ---
 
   filters.addEventListener("click", (e) => {
@@ -360,6 +496,13 @@ document.addEventListener("DOMContentLoaded", () => {
   searchInput.addEventListener("input", (e) => {
     state.searchQuery = e.target.value || "";
     render();
+  });
+
+  topbarNav.addEventListener("click", (e) => {
+    const navLink = e.target.closest("[data-nav-view]");
+    if (!navLink) return;
+    e.preventDefault();
+    setPage(navLink.dataset.navView);
   });
 
   // --- Init ---
