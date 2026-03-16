@@ -7,24 +7,29 @@
 }
 
 :root {
-  --bg: #f7f7f4;
-  --fg: #26251e;
-  --fg-secondary: rgba(38, 37, 30, 0.6);
+  --bg: #14120b;
+  --fg: #edecec;
+  --fg-secondary: rgba(237, 236, 236, 0.6);
   --accent: #f54e00;
-  --accent-subtle: rgba(245, 78, 0, 0.12);
+  --accent-subtle: rgba(245, 78, 0, 0.18);
   --accent-hover: #ff5c0d;
   --accent-orange: #f54e00;
-  --card: #f2f1ed;
-  --card-border: rgba(0, 0, 0, 0.06);
-  --card-hover: #ebeae5;
-  --surface: #ebeae5;
-  --divider: #e6e5e0;
+  --card: #1b1913;
+  --card-01: #1d1b15;
+  --card-02: #201e18;
+  --card-03: #26241e;
+  --card-04: #2b2923;
+  --card-border: rgba(237, 236, 236, 0.08);
+  --card-hover: #201e18;
+  --surface: #26241e;
+  --divider: #2b2923;
   --radius: 12px;
   --radius-sm: 8px;
 }
 
 html {
   font-size: 15px;
+  color-scheme: dark;
 }
 
 body {
@@ -42,7 +47,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(242, 241, 237, 0.85);
+  background: rgba(27, 25, 19, 0.88);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--card-border);
@@ -179,7 +184,7 @@ body {
 .filter-btn.active {
   background: var(--card);
   color: var(--fg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .search-input {
@@ -226,7 +231,7 @@ body {
 .view-toggle-btn.active {
   background: var(--card);
   color: var(--fg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .task-count {
@@ -262,7 +267,7 @@ body {
 
 .task-card:hover {
   background: var(--card-hover);
-  border-color: rgba(0, 0, 0, 0.08);
+  border-color: rgba(237, 236, 236, 0.14);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -280,7 +285,7 @@ body {
 }
 
 .status-todo {
-  border: 2px solid rgba(38, 37, 30, 0.25);
+  border: 2px solid rgba(237, 236, 236, 0.35);
   background: transparent;
 }
 
@@ -314,7 +319,7 @@ body {
 .task-card[data-status="done"] .task-title {
   color: var(--fg-secondary);
   text-decoration: line-through;
-  text-decoration-color: rgba(38, 37, 30, 0.2);
+  text-decoration-color: rgba(237, 236, 236, 0.25);
 }
 
 .task-meta {
@@ -346,7 +351,7 @@ body {
 
 .priority-low {
   color: var(--fg-secondary);
-  background: rgba(38, 37, 30, 0.06);
+  background: rgba(237, 236, 236, 0.08);
 }
 
 /* ---- Board ---- */
@@ -456,7 +461,7 @@ body {
 .board-task-title.done {
   color: var(--fg-secondary);
   text-decoration: line-through;
-  text-decoration-color: rgba(38, 37, 30, 0.2);
+  text-decoration-color: rgba(237, 236, 236, 0.25);
 }
 
 .board-task-priority {
@@ -482,7 +487,7 @@ body {
 
 .board-task-priority.priority-low {
   color: var(--fg-secondary);
-  background: rgba(38, 37, 30, 0.06);
+  background: rgba(237, 236, 236, 0.08);
 }
 
 .board-task-meta {
