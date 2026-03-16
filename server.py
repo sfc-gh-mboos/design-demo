@@ -350,16 +350,6 @@ def analytics_trends():
     return jsonify(data["trends"])
 
 
-@app.route("/analytics")
-def analytics_page():
-    return send_from_directory(".", "analytics.html")
-
-
-@app.route("/heatmap")
-def heatmap_page():
-    return send_from_directory(".", "heatmap.html")
-
-
 @app.route("/api/analytics/heatmap", methods=["GET"])
 def analytics_heatmap():
     weeks = request.args.get("weeks", 12, type=int)
@@ -369,61 +359,74 @@ def analytics_heatmap():
     today = datetime.now(timezone.utc).date()
     end_date = today
     start_date = end_date - timedelta(weeks=weeks) + timedelta(days=1)
-    start_date -= timedelta(days=start_date.weekday())
+    start_date = start_date - timedelta(days=start_date.weekday())
 
     rows = conn.execute(
-        """SELECT DATE(completed_at) as day, COUNT(*) as count
-           FROM tasks
-           WHERE completed_at IS NOT NULL
-             AND DATE(completed_at) >= ?
-             AND DATE(completed_at) <= ?
-           GROUP BY DATE(completed_at)""",
+        """
+        SELECT DATE(completed_at) as day, COUNT(*) as count
+        FROM tasks
+        WHERE completed_at IS NOT NULL
+          AND DATE(completed_at) >= ?
+          AND DATE(completed_at) <= ?
+        GROUP BY DATE(completed_at)
+        """,
         (start_date.isoformat(), end_date.isoformat()),
     ).fetchall()
+    conn.close()
 
     counts = {row["day"]: row["count"] for row in rows}
 
     days = []
     d = start_date
     while d <= end_date:
-        iso = d.isoformat()
-        days.append({"date": iso, "count": counts.get(iso, 0)})
+        days.append({"date": d.isoformat(), "count": counts.get(d.isoformat(), 0)})
         d += timedelta(days=1)
 
-    all_completed = conn.execute(
-        "SELECT DATE(completed_at) as day FROM tasks WHERE completed_at IS NOT NULL ORDER BY day"
-    ).fetchall()
-    conn.close()
-
-    completed_dates = sorted({row["day"] for row in all_completed})
-
-    total = sum(item["count"] for item in days)
+    max_count = max((item["count"] for item in days), default=0)
 
     current_streak = 0
     d = today
-    completed_set = set(completed_dates)
-    while d.isoformat() in completed_set:
-        current_streak += 1
-        d -= timedelta(days=1)
+    while True:
+        if counts.get(d.isoformat(), 0) > 0:
+            current_streak += 1
+            d -= timedelta(days=1)
+        else:
+            break
 
+    all_dates_sorted = sorted(counts.keys())
     longest_streak = 0
     streak = 0
     prev = None
-    for ds in completed_dates:
-        dt = datetime.strptime(ds, "%Y-%m-%d").date()
-        if prev and (dt - prev).days == 1:
+    for date_str in all_dates_sorted:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+        if prev and (date_obj - prev).days == 1:
             streak += 1
         else:
             streak = 1
         longest_streak = max(longest_streak, streak)
-        prev = dt
+        prev = date_obj
+
+    total_completions = sum(item["count"] for item in days)
 
     return jsonify({
         "days": days,
-        "current_streak": current_streak,
-        "longest_streak": longest_streak,
-        "total": total,
+        "max_count": max_count,
+        "stats": {
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "total_completions": total_completions,
+        },
     })
+
+
+@app.route("/analytics")
+def analytics_page():
+    return send_from_directory(".", "analytics.html")
+
+
+@app.route("/heatmap")
+def heatmap_page():
+    return send_from_directory(".", "heatmap.html")
 
 
 if __name__ == "__main__":
