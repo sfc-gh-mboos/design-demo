@@ -55,6 +55,36 @@ def row_to_dict(row):
     return {key: row[key] for key in row.keys()}
 
 
+def build_daily_counts(counts_by_date, start_date, end_date):
+    daily_counts = []
+    current_day = start_date
+    while current_day <= end_date:
+        date_key = current_day.isoformat()
+        daily_counts.append({"date": date_key, "count": counts_by_date.get(date_key, 0)})
+        current_day += timedelta(days=1)
+    return daily_counts
+
+
+def calculate_streaks(daily_counts):
+    longest_streak = 0
+    current_run = 0
+    for day in daily_counts:
+        if day["count"] > 0:
+            current_run += 1
+            longest_streak = max(longest_streak, current_run)
+        else:
+            current_run = 0
+
+    current_streak = 0
+    for day in reversed(daily_counts):
+        if day["count"] > 0:
+            current_streak += 1
+        else:
+            break
+
+    return current_streak, longest_streak
+
+
 def normalize_title(title):
     if not title or not str(title).strip():
         return None
@@ -150,6 +180,50 @@ def get_tasks():
         rows = conn.execute("SELECT * FROM tasks").fetchall()
     conn.close()
     return jsonify([row_to_dict(r) for r in rows])
+
+
+@app.route("/api/analytics/heatmap", methods=["GET"])
+def get_heatmap():
+    today = datetime.now(timezone.utc).date()
+    end_date = today
+    current_week_monday = end_date - timedelta(days=end_date.weekday())
+    start_date = current_week_monday - timedelta(weeks=11)
+
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT date(completed_at) AS completed_date, COUNT(*) AS completion_count
+        FROM tasks
+        WHERE completed_at IS NOT NULL
+          AND date(completed_at) BETWEEN ? AND ?
+        GROUP BY date(completed_at)
+        ORDER BY completed_date ASC
+        """,
+        (start_date.isoformat(), end_date.isoformat()),
+    ).fetchall()
+    conn.close()
+
+    counts_by_date = {
+        row["completed_date"]: int(row["completion_count"])
+        for row in rows
+        if row["completed_date"]
+    }
+    daily_counts = build_daily_counts(counts_by_date, start_date, end_date)
+    current_streak, longest_streak = calculate_streaks(daily_counts)
+    total_completions = sum(day["count"] for day in daily_counts)
+
+    return jsonify(
+        {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "daily_counts": daily_counts,
+            "summary": {
+                "current_streak": current_streak,
+                "longest_streak": longest_streak,
+                "total_completions": total_completions,
+            },
+        }
+    )
 
 
 @app.route("/api/tasks/<int:task_id>", methods=["PUT"])
