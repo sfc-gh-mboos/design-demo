@@ -1,12 +1,47 @@
 document.addEventListener("DOMContentLoaded", () => {
   const cohortFilter = document.getElementById("cohortFilter");
-  
+  const startDateInput = document.getElementById("startDate");
+  const endDateInput = document.getElementById("endDate");
+  const datePresetBtns = document.querySelectorAll(".date-preset-btn");
+
+  function formatDateForAPI(d) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  function setDateRange(days) {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (days === "all") {
+      startDateInput.value = "";
+      endDateInput.value = "";
+    } else {
+      const start = new Date(today);
+      start.setDate(start.getDate() - (parseInt(days, 10) - 1));
+      start.setHours(0, 0, 0, 0);
+      startDateInput.value = formatDateForAPI(start);
+      endDateInput.value = formatDateForAPI(today);
+    }
+  }
+
+  function getDateParams() {
+    const start = startDateInput.value;
+    const end = endDateInput.value;
+    return { start, end };
+  }
+
+  function setPresetActive(days) {
+    datePresetBtns.forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.days === String(days));
+    });
+  }
+
   // Chart instances (will be created on first load)
   let categoryChart = null;
   let priorityChart = null;
   let weeklyProgressChart = null;
   let priorityFocusChart = null;
   let productivityScoreChart = null;
+  let dailyVolumeChart = null;
   
   // Color palette using Cursor brand colors
   const colors = {
@@ -32,24 +67,28 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // API layer
   const AnalyticsAPI = {
-    async getSummary(cohort) {
-      const res = await fetch(`/api/analytics/summary?cohort=${cohort}`);
+    _params(cohort, start, end) {
+      let url = `cohort=${encodeURIComponent(cohort)}`;
+      if (start) url += `&start_date=${encodeURIComponent(start)}`;
+      if (end) url += `&end_date=${encodeURIComponent(end)}`;
+      return url;
+    },
+    async getSummary(cohort, start, end) {
+      const res = await fetch(`/api/analytics/summary?${this._params(cohort, start, end)}`);
       if (!res.ok) {
         throw new Error(`Failed to fetch summary: ${res.statusText}`);
       }
       return res.json();
     },
-    
-    async getDistribution(cohort) {
-      const res = await fetch(`/api/analytics/distribution?cohort=${cohort}`);
+    async getDistribution(cohort, start, end) {
+      const res = await fetch(`/api/analytics/distribution?${this._params(cohort, start, end)}`);
       if (!res.ok) {
         throw new Error(`Failed to fetch distribution: ${res.statusText}`);
       }
       return res.json();
     },
-    
-    async getTrends(cohort) {
-      const res = await fetch(`/api/analytics/trends?cohort=${cohort}`);
+    async getTrends(cohort, start, end) {
+      const res = await fetch(`/api/analytics/trends?${this._params(cohort, start, end)}`);
       if (!res.ok) {
         throw new Error(`Failed to fetch trends: ${res.statusText}`);
       }
@@ -412,13 +451,104 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   
+  // Render daily volume (stacked bar chart by status)
+  function renderDailyVolumeChart(data) {
+    const ctx = document.getElementById("dailyVolumeChart").getContext("2d");
+
+    if (dailyVolumeChart) {
+      dailyVolumeChart.destroy();
+    }
+
+    const days = data.daily_volume.map(d => {
+      const date = new Date(d.date);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    });
+
+    dailyVolumeChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: days,
+        datasets: [
+          {
+            label: "Done",
+            data: data.daily_volume.map(d => d.done),
+            backgroundColor: colors.priorityColors.high,
+            borderRadius: 2
+          },
+          {
+            label: "In Progress",
+            data: data.daily_volume.map(d => d.in_progress),
+            backgroundColor: colors.priorityColors.medium,
+            borderRadius: 2
+          },
+          {
+            label: "To Do",
+            data: data.daily_volume.map(d => d.todo),
+            backgroundColor: colors.priorityColors.low,
+            borderRadius: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              font: { size: 11 },
+              color: colors.fg,
+              padding: 12
+            }
+          },
+          tooltip: {
+            callbacks: {
+              afterTitle: function(tooltipItems) {
+                const idx = tooltipItems[0].dataIndex;
+                const item = data.daily_volume[idx];
+                return `Total: ${item.todo + item.in_progress + item.done}`;
+              },
+              label: function(context) {
+                return `${context.dataset.label}: ${context.parsed.y}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            stacked: true,
+            ticks: {
+              color: colors.fgSecondary,
+              font: { size: 10 }
+            },
+            grid: {
+              display: false
+            }
+          },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            ticks: {
+              color: colors.fgSecondary,
+              font: { size: 10 },
+              stepSize: 1
+            },
+            grid: {
+              color: "rgba(38, 37, 30, 0.08)"
+            }
+          }
+        }
+      }
+    });
+  }
+
   // Load and render all data
-  async function loadAnalytics(cohort) {
+  async function loadAnalytics(cohort, startDate, endDate) {
     try {
       const [summary, distribution, trends] = await Promise.all([
-        AnalyticsAPI.getSummary(cohort),
-        AnalyticsAPI.getDistribution(cohort),
-        AnalyticsAPI.getTrends(cohort)
+        AnalyticsAPI.getSummary(cohort, startDate, endDate),
+        AnalyticsAPI.getDistribution(cohort, startDate, endDate),
+        AnalyticsAPI.getTrends(cohort, startDate, endDate)
       ]);
       
       updateKPIs(summary);
@@ -426,6 +556,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderPriorityChart(distribution);
       renderWeeklyProgressChart(trends);
       renderPriorityFocusChart(trends);
+      renderDailyVolumeChart(trends);
       renderProductivityScoreChart(trends);
     } catch (error) {
       console.error("Failed to load analytics:", error);
@@ -438,11 +569,35 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   
-  // Initial load
-  loadAnalytics(cohortFilter.value);
-  
+  function refreshAnalytics() {
+    const { start, end } = getDateParams();
+    loadAnalytics(cohortFilter.value, start || undefined, end || undefined);
+  }
+
+  // Initial load: default to 7d range
+  setDateRange(7);
+  setPresetActive("7");
+  refreshAnalytics();
+
   // Cohort filter change handler
-  cohortFilter.addEventListener("change", (e) => {
-    loadAnalytics(e.target.value);
+  cohortFilter.addEventListener("change", () => refreshAnalytics());
+
+  // Date preset click handlers
+  datePresetBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setDateRange(btn.dataset.days);
+      setPresetActive(btn.dataset.days);
+      refreshAnalytics();
+    });
+  });
+
+  // Custom date input handlers (clear preset selection)
+  startDateInput.addEventListener("change", () => {
+    setPresetActive("");
+    refreshAnalytics();
+  });
+  endDateInput.addEventListener("change", () => {
+    setPresetActive("");
+    refreshAnalytics();
   });
 });

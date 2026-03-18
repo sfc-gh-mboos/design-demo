@@ -30,15 +30,31 @@
     </section>
 
     <div class="cohort-filter-wrapper">
-      <label for="cohortFilter" class="cohort-filter-label">Filter by Cohort:</label>
-      <select id="cohortFilter" class="cohort-filter">
-        <option value="all">All Users</option>
-        <option value="power_users">Power Users</option>
-        <option value="new_users">New Users</option>
-        <option value="enterprise">Enterprise</option>
-        <option value="team_alpha">Team Alpha</option>
-        <option value="team_beta">Team Beta</option>
-      </select>
+      <div class="filter-row">
+        <label for="cohortFilter" class="cohort-filter-label">Filter by Cohort:</label>
+        <select id="cohortFilter" class="cohort-filter">
+          <option value="all">All Users</option>
+          <option value="power_users">Power Users</option>
+          <option value="new_users">New Users</option>
+          <option value="enterprise">Enterprise</option>
+          <option value="team_alpha">Team Alpha</option>
+          <option value="team_beta">Team Beta</option>
+        </select>
+      </div>
+      <div class="filter-row date-filter-row">
+        <label class="date-filter-label">Date Range:</label>
+        <div class="date-presets">
+          <button type="button" class="date-preset-btn active" data-days="7">7d</button>
+          <button type="button" class="date-preset-btn" data-days="30">30d</button>
+          <button type="button" class="date-preset-btn" data-days="90">90d</button>
+          <button type="button" class="date-preset-btn" data-days="all">All</button>
+        </div>
+        <div class="date-inputs">
+          <input type="date" id="startDate" class="date-input" aria-label="Start date">
+          <span class="date-separator">–</span>
+          <input type="date" id="endDate" class="date-input" aria-label="End date">
+        </div>
+      </div>
     </div>
 
     <div class="kpi-grid">
@@ -76,6 +92,10 @@
       <div class="chart-card">
         <h3 class="chart-title">Priority Focus Over Time</h3>
         <canvas id="priorityFocusChart"></canvas>
+      </div>
+      <div class="chart-card chart-card-full">
+        <h3 class="chart-title">Daily Task Volume</h3>
+        <canvas id="dailyVolumeChart"></canvas>
       </div>
       <div class="chart-card chart-card-full">
         <h3 class="chart-title">Productivity Score Trend</h3>
