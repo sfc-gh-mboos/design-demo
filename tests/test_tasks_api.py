@@ -143,20 +143,15 @@ def test_heatmap_returns_expected_shape(api_client):
     payload = response.get_json()
 
     assert isinstance(payload, dict)
-    assert "days" in payload
-    assert "max_count" in payload
-    assert "stats" in payload
+    assert "daily_counts" in payload
+    assert "current_streak" in payload
+    assert "longest_streak" in payload
+    assert "total_completions" in payload
 
-    assert isinstance(payload["days"], list)
-    assert isinstance(payload["max_count"], int)
-
-    stats = payload["stats"]
-    assert "current_streak" in stats
-    assert "longest_streak" in stats
-    assert "total_completions" in stats
-    assert isinstance(stats["current_streak"], int)
-    assert isinstance(stats["longest_streak"], int)
-    assert isinstance(stats["total_completions"], int)
+    assert isinstance(payload["daily_counts"], list)
+    assert isinstance(payload["current_streak"], int)
+    assert isinstance(payload["longest_streak"], int)
+    assert isinstance(payload["total_completions"], int)
 
 
 def test_heatmap_days_have_date_and_count(api_client):
@@ -165,7 +160,7 @@ def test_heatmap_days_have_date_and_count(api_client):
     assert response.status_code == 200
     payload = response.get_json()
 
-    for day in payload["days"]:
+    for day in payload["daily_counts"]:
         assert "date" in day
         assert "count" in day
         assert isinstance(day["count"], int)
@@ -176,12 +171,12 @@ def test_heatmap_weeks_param_bounds(api_client):
     response_min = api_client.get("/api/analytics/heatmap?weeks=0")
     assert response_min.status_code == 200
     data_min = response_min.get_json()
-    assert isinstance(data_min["days"], list)
+    assert isinstance(data_min["daily_counts"], list)
 
     response_max = api_client.get("/api/analytics/heatmap?weeks=100")
     assert response_max.status_code == 200
     data_max = response_max.get_json()
-    assert isinstance(data_max["days"], list)
+    assert isinstance(data_max["daily_counts"], list)
 
 
 def test_heatmap_with_completed_tasks(api_client):
@@ -195,7 +190,7 @@ def test_heatmap_with_completed_tasks(api_client):
     assert response.status_code == 200
     payload = response.get_json()
 
-    assert payload["stats"]["total_completions"] >= 0
+    assert payload["total_completions"] >= 0
 
 
 def test_heatmap_page_serves(api_client):
