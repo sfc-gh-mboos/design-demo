@@ -1,142 +1,124 @@
-document.addEventListener("DOMContentLoaded", async () => {
-  const grid = document.getElementById("heatmapGrid");
-  const monthLabels = document.getElementById("monthLabels");
-  const tooltip = document.getElementById("heatmapTooltip");
+(function () {
+  var WEEKS = 12;
+  var DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  var MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  try {
-    const res = await fetch("/api/analytics/heatmap?weeks=12");
-    if (!res.ok) throw new Error(res.statusText);
-    const data = await res.json();
-    renderStats(data.stats);
-    renderGrid(data.days, data.max_count);
-  } catch (err) {
-    grid.textContent = "Failed to load heatmap data.";
-  }
-
-  function renderStats(stats) {
-    setStatValue("currentStreak", stats.current_streak, "days");
-    setStatValue("longestStreak", stats.longest_streak, "days");
-    setStatValue("totalCompletions", stats.total_completions);
-  }
-
-  function setStatValue(id, value, unit) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const numEl = el.querySelector(".heatmap-stat-number");
-    const unitEl = el.querySelector(".heatmap-stat-unit");
-    if (numEl) numEl.textContent = value;
-    if (unitEl) unitEl.textContent = unit || "";
-  }
-
-  function getLevel(count, maxCount) {
+  function getLevel(count) {
     if (count === 0) return 0;
-    if (maxCount === 0) return 0;
-    const ratio = count / maxCount;
-    if (ratio <= 0.15) return 1;
-    if (ratio <= 0.35) return 2;
-    if (ratio <= 0.55) return 3;
-    if (ratio <= 0.75) return 4;
+    if (count === 1) return 1;
+    if (count === 2) return 2;
+    if (count <= 4) return 3;
+    if (count <= 6) return 4;
     return 5;
   }
 
-  function renderGrid(days, maxCount) {
-    const weeks = groupByWeek(days);
-    const numWeeks = weeks.length;
-
-    grid.style.gridTemplateColumns = `repeat(${numWeeks}, 1fr)`;
-
-    renderMonthLabels(weeks, numWeeks);
-
-    weeks.forEach((week) => {
-      const col = document.createElement("div");
-      col.className = "heatmap-column";
-
-      for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
-        const dayData = week.find((d) => {
-          const date = new Date(d.date + "T00:00:00");
-          return date.getDay() === (dayOfWeek + 1) % 7; // Convert Mon=0 to JS day
-        });
-
-        const cell = document.createElement("div");
-        if (dayData) {
-          const level = getLevel(dayData.count, maxCount);
-          cell.className = `heatmap-cell heatmap-level-${level}`;
-          cell.dataset.date = dayData.date;
-          cell.dataset.count = dayData.count;
-          cell.addEventListener("mouseenter", showTooltip);
-          cell.addEventListener("mouseleave", hideTooltip);
-        } else {
-          cell.className = "heatmap-cell heatmap-cell-empty";
-        }
-        col.appendChild(cell);
-      }
-
-      grid.appendChild(col);
+  function formatDate(dateStr) {
+    var d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
     });
   }
 
-  function groupByWeek(days) {
-    const weeks = [];
-    let currentWeek = [];
+  function buildWeeks(dailyCounts) {
+    var counts = {};
+    dailyCounts.forEach(function (d) { counts[d.date] = d.count; });
 
-    days.forEach((day) => {
-      const date = new Date(day.date + "T00:00:00");
-      const dayOfWeek = (date.getDay() + 6) % 7; // Monday = 0
+    var today = new Date();
+    today.setHours(12, 0, 0, 0);
 
-      if (dayOfWeek === 0 && currentWeek.length > 0) {
-        weeks.push(currentWeek);
-        currentWeek = [];
+    var dow = today.getDay();
+    var mondayOffset = dow === 0 ? 6 : dow - 1;
+    var currentMonday = new Date(today);
+    currentMonday.setDate(today.getDate() - mondayOffset);
+
+    var startDate = new Date(currentMonday);
+    startDate.setDate(startDate.getDate() - (WEEKS - 1) * 7);
+
+    var weeks = [];
+    var cursor = new Date(startDate);
+
+    for (var w = 0; w < WEEKS; w++) {
+      var week = [];
+      for (var d = 0; d < 7; d++) {
+        var date = new Date(cursor);
+        date.setDate(cursor.getDate() + d);
+        var dateStr = date.toISOString().split('T')[0];
+        var isFuture = date > today;
+        week.push({ date: dateStr, count: isFuture ? 0 : (counts[dateStr] || 0), isFuture: isFuture });
       }
-      currentWeek.push(day);
-    });
-
-    if (currentWeek.length > 0) {
-      weeks.push(currentWeek);
+      weeks.push(week);
+      cursor.setDate(cursor.getDate() + 7);
     }
 
     return weeks;
   }
 
-  function renderMonthLabels(weeks, numWeeks) {
-    monthLabels.style.gridTemplateColumns = `repeat(${numWeeks}, 1fr)`;
-    let lastMonth = "";
+  function renderHeatmap(data) {
+    document.getElementById('currentStreak').textContent = data.current_streak;
+    document.getElementById('longestStreak').textContent = data.longest_streak;
+    document.getElementById('totalCompletions').textContent = data.total_completions;
 
-    weeks.forEach((week) => {
-      const label = document.createElement("span");
-      label.className = "heatmap-month-label";
+    var weeks = buildWeeks(data.daily_counts);
+    var grid = document.getElementById('heatmapGrid');
+    grid.innerHTML = '';
+    grid.style.gridTemplateColumns = '33px repeat(' + WEEKS + ', 1fr)';
 
-      const firstDay = week[0];
-      const date = new Date(firstDay.date + "T00:00:00");
-      const month = date.toLocaleDateString("en-US", { month: "short" });
-
-      if (month !== lastMonth) {
-        label.textContent = month;
-        lastMonth = month;
+    // Row 0: month labels
+    grid.appendChild(document.createElement('div'));
+    for (var w = 0; w < weeks.length; w++) {
+      var el = document.createElement('div');
+      var firstDay = new Date(weeks[w][0].date + 'T12:00:00');
+      var isNewMonth = w === 0 ||
+        firstDay.getMonth() !== new Date(weeks[w - 1][0].date + 'T12:00:00').getMonth();
+      if (isNewMonth) {
+        el.className = 'heatmap-month-label';
+        el.textContent = MONTH_NAMES[firstDay.getMonth()];
       }
+      grid.appendChild(el);
+    }
 
-      monthLabels.appendChild(label);
-    });
+    // Rows 1–7: day labels + cells
+    for (var dayIdx = 0; dayIdx < 7; dayIdx++) {
+      var label = document.createElement('div');
+      label.className = 'heatmap-day-label';
+      if (dayIdx === 0 || dayIdx === 2 || dayIdx === 4 || dayIdx === 6) {
+        label.textContent = DAY_NAMES[dayIdx];
+      }
+      grid.appendChild(label);
+
+      for (var wi = 0; wi < weeks.length; wi++) {
+        var day = weeks[wi][dayIdx];
+        var cell = document.createElement('div');
+
+        if (day.isFuture) {
+          cell.className = 'heatmap-cell heatmap-cell-future';
+        } else {
+          cell.className = 'heatmap-cell level-' + getLevel(day.count);
+          var tooltip = document.createElement('div');
+          tooltip.className = 'heatmap-tooltip';
+          var txt = day.count === 0 ? 'No tasks' :
+            day.count + ' task' + (day.count !== 1 ? 's' : '');
+          tooltip.textContent = txt + ' on ' + formatDate(day.date);
+          cell.appendChild(tooltip);
+        }
+
+        grid.appendChild(cell);
+      }
+    }
   }
 
-  function showTooltip(e) {
-    const cell = e.target;
-    const date = cell.dataset.date;
-    const count = parseInt(cell.dataset.count, 10);
-    const dateStr = new Date(date + "T00:00:00").toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    tooltip.textContent = `${count} task${count !== 1 ? "s" : ""} completed on ${dateStr}`;
-    tooltip.classList.add("visible");
-
-    const rect = cell.getBoundingClientRect();
-    tooltip.style.left = `${rect.left + rect.width / 2}px`;
-    tooltip.style.top = `${rect.top - 8}px`;
+  function loadHeatmap() {
+    fetch('/api/analytics/heatmap?weeks=' + WEEKS)
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(renderHeatmap)
+      .catch(function (err) {
+        console.error('Failed to load heatmap:', err);
+      });
   }
 
-  function hideTooltip() {
-    tooltip.classList.remove("visible");
-  }
-});
+  document.addEventListener('DOMContentLoaded', loadHeatmap);
+})();
