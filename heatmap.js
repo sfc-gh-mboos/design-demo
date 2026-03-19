@@ -1,124 +1,186 @@
-(function () {
-  var WEEKS = 12;
-  var DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  var MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+document.addEventListener("DOMContentLoaded", () => {
+  const grid = document.getElementById("heatmapGrid");
+  const dayLabels = document.getElementById("heatmapDayLabels");
+  const monthLabels = document.getElementById("heatmapMonthLabels");
 
-  function getLevel(count) {
+  const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const SHOWN_DAYS = [0, 2, 4, 6]; // Mon, Wed, Fri, Sun
+
+  function getLevel(count, max) {
     if (count === 0) return 0;
-    if (count === 1) return 1;
-    if (count === 2) return 2;
-    if (count <= 4) return 3;
-    if (count <= 6) return 4;
+    if (max <= 0) return 1;
+    const ratio = count / max;
+    if (ratio <= 0.15) return 1;
+    if (ratio <= 0.30) return 2;
+    if (ratio <= 0.50) return 3;
+    if (ratio <= 0.70) return 4;
     return 5;
   }
 
   function formatDate(dateStr) {
-    var d = new Date(dateStr + 'T12:00:00');
-    return d.toLocaleDateString('en-US', {
-      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+    const d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   }
 
-  function buildWeeks(dailyCounts) {
-    var counts = {};
-    dailyCounts.forEach(function (d) { counts[d.date] = d.count; });
-
-    var today = new Date();
-    today.setHours(12, 0, 0, 0);
-
-    var dow = today.getDay();
-    var mondayOffset = dow === 0 ? 6 : dow - 1;
-    var currentMonday = new Date(today);
-    currentMonday.setDate(today.getDate() - mondayOffset);
-
-    var startDate = new Date(currentMonday);
-    startDate.setDate(startDate.getDate() - (WEEKS - 1) * 7);
-
-    var weeks = [];
-    var cursor = new Date(startDate);
-
-    for (var w = 0; w < WEEKS; w++) {
-      var week = [];
-      for (var d = 0; d < 7; d++) {
-        var date = new Date(cursor);
-        date.setDate(cursor.getDate() + d);
-        var dateStr = date.toISOString().split('T')[0];
-        var isFuture = date > today;
-        week.push({ date: dateStr, count: isFuture ? 0 : (counts[dateStr] || 0), isFuture: isFuture });
+  function renderDayLabels() {
+    dayLabels.innerHTML = "";
+    DAY_NAMES.forEach((name, i) => {
+      const label = document.createElement("div");
+      label.className = "heatmap-day-label";
+      if (!SHOWN_DAYS.includes(i)) {
+        label.classList.add("hidden-label");
       }
-      weeks.push(week);
-      cursor.setDate(cursor.getDate() + 7);
-    }
-
-    return weeks;
+      label.textContent = SHOWN_DAYS.includes(i) ? name : "";
+      dayLabels.appendChild(label);
+    });
   }
 
-  function renderHeatmap(data) {
-    document.getElementById('currentStreak').textContent = data.current_streak;
-    document.getElementById('longestStreak').textContent = data.longest_streak;
-    document.getElementById('totalCompletions').textContent = data.total_completions;
+  function renderGrid(days) {
+    grid.innerHTML = "";
+    monthLabels.innerHTML = "";
 
-    var weeks = buildWeeks(data.daily_counts);
-    var grid = document.getElementById('heatmapGrid');
-    grid.innerHTML = '';
-    grid.style.gridTemplateColumns = '33px repeat(' + WEEKS + ', 1fr)';
+    if (!days || days.length === 0) return;
 
-    // Row 0: month labels
-    grid.appendChild(document.createElement('div'));
-    for (var w = 0; w < weeks.length; w++) {
-      var el = document.createElement('div');
-      var firstDay = new Date(weeks[w][0].date + 'T12:00:00');
-      var isNewMonth = w === 0 ||
-        firstDay.getMonth() !== new Date(weeks[w - 1][0].date + 'T12:00:00').getMonth();
-      if (isNewMonth) {
-        el.className = 'heatmap-month-label';
-        el.textContent = MONTH_NAMES[firstDay.getMonth()];
-      }
-      grid.appendChild(el);
+    const maxCount = Math.max(...days.map(d => d.count), 1);
+
+    // Organize days into weeks (columns)
+    // Each week column has 7 rows: Mon(0) through Sun(6)
+    const firstDate = new Date(days[0].date + "T00:00:00");
+    const firstDayOfWeek = (firstDate.getDay() + 6) % 7; // Convert Sun=0 to Mon=0 based
+
+    const weeks = [];
+    let currentWeek = new Array(7).fill(null);
+
+    // Fill leading empty cells
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      currentWeek[i] = null;
     }
 
-    // Rows 1–7: day labels + cells
-    for (var dayIdx = 0; dayIdx < 7; dayIdx++) {
-      var label = document.createElement('div');
-      label.className = 'heatmap-day-label';
-      if (dayIdx === 0 || dayIdx === 2 || dayIdx === 4 || dayIdx === 6) {
-        label.textContent = DAY_NAMES[dayIdx];
+    let dayIndex = firstDayOfWeek;
+    for (const day of days) {
+      if (dayIndex === 7) {
+        weeks.push(currentWeek);
+        currentWeek = new Array(7).fill(null);
+        dayIndex = 0;
       }
-      grid.appendChild(label);
+      currentWeek[dayIndex] = day;
+      dayIndex++;
+    }
+    if (currentWeek.some(d => d !== null)) {
+      weeks.push(currentWeek);
+    }
 
-      for (var wi = 0; wi < weeks.length; wi++) {
-        var day = weeks[wi][dayIdx];
-        var cell = document.createElement('div');
+    // Set grid template columns
+    grid.style.gridTemplateColumns = `repeat(${weeks.length}, 1fr)`;
 
-        if (day.isFuture) {
-          cell.className = 'heatmap-cell heatmap-cell-future';
-        } else {
-          cell.className = 'heatmap-cell level-' + getLevel(day.count);
-          var tooltip = document.createElement('div');
-          tooltip.className = 'heatmap-tooltip';
-          var txt = day.count === 0 ? 'No tasks' :
-            day.count + ' task' + (day.count !== 1 ? 's' : '');
-          tooltip.textContent = txt + ' on ' + formatDate(day.date);
-          cell.appendChild(tooltip);
+    // Render month labels
+    let lastMonth = -1;
+    const monthPositions = [];
+    weeks.forEach((week, weekIdx) => {
+      const firstDayInWeek = week.find(d => d !== null);
+      if (firstDayInWeek) {
+        const date = new Date(firstDayInWeek.date + "T00:00:00");
+        const month = date.getMonth();
+        if (month !== lastMonth) {
+          monthPositions.push({ month, weekIdx });
+          lastMonth = month;
         }
+      }
+    });
 
+    // Create month label containers
+    monthLabels.style.gridTemplateColumns = `repeat(${weeks.length}, 1fr)`;
+    for (let i = 0; i < weeks.length; i++) {
+      const label = document.createElement("div");
+      label.className = "heatmap-month-label";
+      const pos = monthPositions.find(p => p.weekIdx === i);
+      if (pos) {
+        label.textContent = MONTH_NAMES[pos.month];
+      }
+      monthLabels.appendChild(label);
+    }
+
+    // Render cells column by column (each column = 1 week)
+    for (let row = 0; row < 7; row++) {
+      for (let col = 0; col < weeks.length; col++) {
+        const day = weeks[col][row];
+        const cell = document.createElement("div");
+        if (day) {
+          const level = getLevel(day.count, maxCount);
+          cell.className = `heatmap-cell level-${level}`;
+          cell.title = `${formatDate(day.date)}: ${day.count} task${day.count !== 1 ? "s" : ""} completed`;
+
+          cell.addEventListener("mouseenter", () => showTooltip(cell, day));
+          cell.addEventListener("mouseleave", hideTooltip);
+        } else {
+          cell.className = "heatmap-cell empty";
+        }
         grid.appendChild(cell);
       }
     }
   }
 
-  function loadHeatmap() {
-    fetch('/api/analytics/heatmap?weeks=' + WEEKS)
-      .then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(renderHeatmap)
-      .catch(function (err) {
-        console.error('Failed to load heatmap:', err);
-      });
+  // Tooltip
+  let tooltipEl = null;
+
+  function showTooltip(cell, day) {
+    hideTooltip();
+    tooltipEl = document.createElement("div");
+    tooltipEl.className = "heatmap-tooltip";
+    tooltipEl.innerHTML = `<strong>${day.count} task${day.count !== 1 ? "s" : ""}</strong> on ${formatDate(day.date)}`;
+
+    document.body.appendChild(tooltipEl);
+
+    const rect = cell.getBoundingClientRect();
+    const tipRect = tooltipEl.getBoundingClientRect();
+    let left = rect.left + rect.width / 2 - tipRect.width / 2;
+    let top = rect.top - tipRect.height - 8;
+
+    if (left < 8) left = 8;
+    if (left + tipRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - tipRect.width - 8;
+    }
+    if (top < 8) {
+      top = rect.bottom + 8;
+    }
+
+    tooltipEl.style.left = `${left}px`;
+    tooltipEl.style.top = `${top}px`;
   }
 
-  document.addEventListener('DOMContentLoaded', loadHeatmap);
-})();
+  function hideTooltip() {
+    if (tooltipEl) {
+      tooltipEl.remove();
+      tooltipEl = null;
+    }
+  }
+
+  function updateStats(stats) {
+    document.getElementById("statCurrentStreak").textContent = stats.current_streak;
+    document.getElementById("statLongestStreak").textContent = stats.longest_streak;
+    document.getElementById("statTotalCompletions").textContent = stats.total_completions;
+  }
+
+  async function loadHeatmap() {
+    try {
+      const res = await fetch("/api/analytics/heatmap?weeks=12");
+      if (!res.ok) throw new Error(res.statusText);
+      const data = await res.json();
+
+      updateStats(data.stats);
+      renderDayLabels();
+      renderGrid(data.days);
+    } catch (err) {
+      console.error("Failed to load heatmap:", err);
+    }
+  }
+
+  loadHeatmap();
+});

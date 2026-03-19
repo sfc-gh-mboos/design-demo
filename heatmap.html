@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Activity Heatmap - Taskflow</title>
   <link rel="stylesheet" href="styles.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -28,41 +25,48 @@
   <main class="heatmap-container">
     <div class="heatmap-header">
       <h1 class="heatmap-title">Activity Heatmap</h1>
+
       <div class="heatmap-stats">
         <div class="heatmap-stat">
           <span class="heatmap-stat-label">Current Streak</span>
-          <div class="heatmap-stat-value">
-            <span class="heatmap-stat-number" id="currentStreak">--</span>
-            <span class="heatmap-stat-unit"> days</span>
-          </div>
+          <span class="heatmap-stat-value">
+            <span class="heatmap-stat-number" id="statCurrentStreak">--</span>
+            <span class="heatmap-stat-unit">days</span>
+          </span>
         </div>
         <div class="heatmap-stat">
           <span class="heatmap-stat-label">Longest Streak</span>
-          <div class="heatmap-stat-value">
-            <span class="heatmap-stat-number" id="longestStreak">--</span>
-            <span class="heatmap-stat-unit"> days</span>
-          </div>
+          <span class="heatmap-stat-value">
+            <span class="heatmap-stat-number" id="statLongestStreak">--</span>
+            <span class="heatmap-stat-unit">days</span>
+          </span>
         </div>
         <div class="heatmap-stat">
           <span class="heatmap-stat-label">Total Completions</span>
-          <div class="heatmap-stat-value">
-            <span class="heatmap-stat-number" id="totalCompletions">--</span>
-          </div>
+          <span class="heatmap-stat-value">
+            <span class="heatmap-stat-number" id="statTotalCompletions">--</span>
+          </span>
         </div>
       </div>
     </div>
 
     <div class="heatmap-card">
-      <div class="heatmap-grid" id="heatmapGrid"></div>
+      <div class="heatmap-grid-wrapper">
+        <div class="heatmap-day-labels" id="heatmapDayLabels"></div>
+        <div class="heatmap-grid-area">
+          <div class="heatmap-month-labels" id="heatmapMonthLabels"></div>
+          <div class="heatmap-grid" id="heatmapGrid"></div>
+        </div>
+      </div>
       <div class="heatmap-legend">
         <span class="heatmap-legend-label">Less</span>
-        <div class="heatmap-legend-scale">
-          <div class="heatmap-legend-box level-0"></div>
-          <div class="heatmap-legend-box level-1"></div>
-          <div class="heatmap-legend-box level-2"></div>
-          <div class="heatmap-legend-box level-3"></div>
-          <div class="heatmap-legend-box level-4"></div>
-          <div class="heatmap-legend-box level-5"></div>
+        <div class="heatmap-legend-cells">
+          <div class="heatmap-cell level-0"></div>
+          <div class="heatmap-cell level-1"></div>
+          <div class="heatmap-cell level-2"></div>
+          <div class="heatmap-cell level-3"></div>
+          <div class="heatmap-cell level-4"></div>
+          <div class="heatmap-cell level-5"></div>
         </div>
         <span class="heatmap-legend-label">More</span>
       </div>

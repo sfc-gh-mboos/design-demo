@@ -426,51 +426,62 @@ def analytics_trends():
     return jsonify(data["trends"])
 
 
-@app.route("/analytics")
-def analytics_page():
-    return send_from_directory(".", "analytics.html")
-
-
-@app.route("/heatmap")
-def heatmap_page():
-    return send_from_directory(".", "heatmap.html")
-
-
 @app.route("/api/analytics/heatmap", methods=["GET"])
 def analytics_heatmap():
-    weeks = request.args.get("weeks", 12, type=int)
-    weeks = max(1, min(52, weeks))
-
     conn = get_db()
-    today = datetime.now(timezone.utc).date()
+    weeks = int(request.args.get("weeks", 12))
+    weeks = max(1, min(weeks, 52))
 
-    start_of_week = today - timedelta(days=today.weekday())
-    start_date = start_of_week - timedelta(weeks=weeks - 1)
+    today = datetime.now(timezone.utc).date()
+    # Align to start of the week containing (today - weeks * 7 days)
+    # Monday = 0
+    start_date = today - timedelta(days=today.weekday()) - timedelta(weeks=weeks - 1)
+    end_date = today
 
     rows = conn.execute(
-        "SELECT DATE(completed_at) as date, COUNT(*) as count "
-        "FROM tasks WHERE completed_at IS NOT NULL "
-        "AND DATE(completed_at) >= ? AND DATE(completed_at) <= ? "
-        "GROUP BY DATE(completed_at) ORDER BY date",
-        (start_date.isoformat(), today.isoformat()),
+        """SELECT DATE(completed_at) as day, COUNT(*) as count
+           FROM tasks
+           WHERE completed_at IS NOT NULL
+             AND DATE(completed_at) >= ?
+             AND DATE(completed_at) <= ?
+           GROUP BY DATE(completed_at)
+           ORDER BY day""",
+        (start_date.isoformat(), end_date.isoformat()),
     ).fetchall()
-    daily_counts = {row["date"]: row["count"] for row in rows}
+    counts_by_day = {r["day"]: r["count"] for r in rows}
 
-    all_rows = conn.execute(
-        "SELECT DISTINCT DATE(completed_at) as date FROM tasks "
-        "WHERE completed_at IS NOT NULL ORDER BY date DESC"
+    # Build day-by-day list from start_date to end_date
+    days = []
+    d = start_date
+    while d <= end_date:
+        days.append({"date": d.isoformat(), "count": counts_by_day.get(d.isoformat(), 0)})
+        d += timedelta(days=1)
+
+    # All-time completion data for streak calculations
+    all_days_rows = conn.execute(
+        """SELECT DISTINCT DATE(completed_at) as day
+           FROM tasks
+           WHERE completed_at IS NOT NULL
+           ORDER BY day DESC"""
     ).fetchall()
-    all_dates = set(row["date"] for row in all_rows)
+    conn.close()
 
+    completed_dates = set(r["day"] for r in all_days_rows)
+    total_completions = sum(d["count"] for d in days)
+
+    # Current streak: consecutive days ending today or yesterday with completions
     current_streak = 0
-    d = today
-    while d.isoformat() in all_dates:
+    check = today
+    if today.isoformat() not in completed_dates:
+        check = today - timedelta(days=1)
+    while check.isoformat() in completed_dates:
         current_streak += 1
-        d -= timedelta(days=1)
+        check -= timedelta(days=1)
 
+    # Longest streak
     longest_streak = 0
-    if all_dates:
-        sorted_dates = sorted(all_dates)
+    if completed_dates:
+        sorted_dates = sorted(completed_dates)
         streak = 1
         for i in range(1, len(sorted_dates)):
             prev = datetime.strptime(sorted_dates[i - 1], "%Y-%m-%d").date()
@@ -482,24 +493,24 @@ def analytics_heatmap():
                 streak = 1
         longest_streak = max(longest_streak, streak)
 
-    total = conn.execute(
-        "SELECT COUNT(*) as count FROM tasks WHERE completed_at IS NOT NULL"
-    ).fetchone()["count"]
-
-    conn.close()
-
-    result = []
-    d = start_date
-    while d <= today:
-        result.append({"date": d.isoformat(), "count": daily_counts.get(d.isoformat(), 0)})
-        d += timedelta(days=1)
-
     return jsonify({
-        "daily_counts": result,
-        "current_streak": current_streak,
-        "longest_streak": longest_streak,
-        "total_completions": total,
+        "stats": {
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "total_completions": total_completions,
+        },
+        "days": days,
     })
+
+
+@app.route("/analytics")
+def analytics_page():
+    return send_from_directory(".", "analytics.html")
+
+
+@app.route("/heatmap")
+def heatmap_page():
+    return send_from_directory(".", "heatmap.html")
 
 
 if __name__ == "__main__":
