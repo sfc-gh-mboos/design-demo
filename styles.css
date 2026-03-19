@@ -131,7 +131,7 @@ body {
   margin-top: 6px;
   color: var(--fg-secondary);
   font-size: 0.95rem;
-  text-align: center;
+  text-align: left;
 }
 
 /* ---- Toolbar ---- */
