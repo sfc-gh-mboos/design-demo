@@ -108,8 +108,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Render cells column by column (each column = 1 week)
-    for (let row = 0; row < 7; row++) {
-      for (let col = 0; col < weeks.length; col++) {
+    for (let col = 0; col < weeks.length; col++) {
+      for (let row = 0; row < 7; row++) {
         const day = weeks[col][row];
         const cell = document.createElement("div");
         if (day) {
