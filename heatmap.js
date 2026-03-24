@@ -1,186 +1,178 @@
 document.addEventListener("DOMContentLoaded", () => {
   const grid = document.getElementById("heatmapGrid");
-  const dayLabels = document.getElementById("heatmapDayLabels");
-  const monthLabels = document.getElementById("heatmapMonthLabels");
+  const dayLabels = document.getElementById("dayLabels");
+  const monthLabels = document.getElementById("monthLabels");
+  const tooltip = document.getElementById("heatmapTooltip");
+  const currentStreakEl = document.getElementById("currentStreak");
+  const longestStreakEl = document.getElementById("longestStreak");
+  const totalCompletionsEl = document.getElementById("totalCompletions");
 
+  const WEEKS = 12;
   const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const SHOWN_DAYS = [0, 2, 4, 6]; // Mon, Wed, Fri, Sun
+  const DAY_LABELS_SHOWN = { 0: "Mon", 2: "Wed", 4: "Fri", 6: "Sun" };
 
-  function getLevel(count, max) {
+  const HeatmapAPI = {
+    async getData(weeks) {
+      const res = await fetch(`/api/analytics/heatmap?weeks=${weeks}`);
+      if (!res.ok) throw new Error(`Failed to fetch heatmap data: ${res.statusText}`);
+      return res.json();
+    },
+  };
+
+  function getIntensityLevel(count, maxCount) {
     if (count === 0) return 0;
-    if (max <= 0) return 1;
-    const ratio = count / max;
+    if (maxCount === 0) return 0;
+    const ratio = count / maxCount;
     if (ratio <= 0.15) return 1;
-    if (ratio <= 0.30) return 2;
-    if (ratio <= 0.50) return 3;
-    if (ratio <= 0.70) return 4;
+    if (ratio <= 0.35) return 2;
+    if (ratio <= 0.55) return 3;
+    if (ratio <= 0.80) return 4;
     return 5;
   }
 
-  function formatDate(dateStr) {
-    const d = new Date(dateStr + "T00:00:00");
-    return d.toLocaleDateString("en-US", {
+  function buildGridData(dailyCounts, endDateStr) {
+    const endDate = new Date(endDateStr + "T12:00:00");
+    const endDow = (endDate.getDay() + 6) % 7; // 0=Mon, 6=Sun
+
+    const columns = [];
+    const monthMarkers = [];
+
+    for (let w = WEEKS - 1; w >= 0; w--) {
+      const column = [];
+      for (let d = 0; d < 7; d++) {
+        const daysBack = endDow + 7 * w - d;
+        if (daysBack < 0) {
+          column.push(null);
+          continue;
+        }
+        const cellDate = new Date(endDate);
+        cellDate.setDate(endDate.getDate() - daysBack);
+        const dateStr = cellDate.toISOString().slice(0, 10);
+        const count = dailyCounts[dateStr] || 0;
+        column.push({ date: dateStr, count, cellDate: new Date(cellDate) });
+      }
+      columns.push(column);
+    }
+
+    let prevMonth = null;
+    columns.forEach((col, idx) => {
+      const firstCell = col.find((c) => c !== null);
+      if (firstCell) {
+        const month = firstCell.cellDate.getMonth();
+        if (month !== prevMonth) {
+          monthMarkers.push({
+            colIndex: idx,
+            label: firstCell.cellDate.toLocaleDateString("en-US", { month: "short" }),
+          });
+          prevMonth = month;
+        }
+      }
+    });
+
+    return { columns, monthMarkers };
+  }
+
+  function renderDayLabels() {
+    dayLabels.innerHTML = "";
+    for (let d = 0; d < 7; d++) {
+      const label = document.createElement("div");
+      label.className = "heatmap-day-label";
+      if (DAY_LABELS_SHOWN[d] !== undefined) {
+        label.textContent = DAY_LABELS_SHOWN[d];
+      }
+      dayLabels.appendChild(label);
+    }
+  }
+
+  function renderMonthLabels(monthMarkers, totalCols) {
+    monthLabels.innerHTML = "";
+    monthLabels.style.gridTemplateColumns = `repeat(${totalCols}, 1fr)`;
+    let lastEnd = 0;
+    monthMarkers.forEach((marker) => {
+      if (marker.colIndex > lastEnd) {
+        const spacer = document.createElement("div");
+        spacer.style.gridColumn = `${lastEnd + 1} / ${marker.colIndex + 1}`;
+        monthLabels.appendChild(spacer);
+      }
+      const label = document.createElement("div");
+      label.className = "heatmap-month-label";
+      label.textContent = marker.label;
+      label.style.gridColumn = `${marker.colIndex + 1}`;
+      monthLabels.appendChild(label);
+      lastEnd = marker.colIndex + 1;
+    });
+  }
+
+  function renderGrid(columns, maxCount) {
+    grid.innerHTML = "";
+    grid.style.gridTemplateColumns = `repeat(${columns.length}, 1fr)`;
+
+    columns.forEach((col) => {
+      const colDiv = document.createElement("div");
+      colDiv.className = "heatmap-column";
+      col.forEach((cell) => {
+        const cellDiv = document.createElement("div");
+        if (cell === null) {
+          cellDiv.className = "heatmap-cell heatmap-cell-empty";
+        } else {
+          const level = getIntensityLevel(cell.count, maxCount);
+          cellDiv.className = `heatmap-cell heatmap-level-${level}`;
+          cellDiv.dataset.date = cell.date;
+          cellDiv.dataset.count = cell.count;
+
+          cellDiv.addEventListener("mouseenter", (e) => showTooltip(e, cell));
+          cellDiv.addEventListener("mouseleave", hideTooltip);
+        }
+        colDiv.appendChild(cellDiv);
+      });
+      grid.appendChild(colDiv);
+    });
+  }
+
+  function showTooltip(e, cell) {
+    const formatted = new Date(cell.date + "T12:00:00").toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",
       year: "numeric",
     });
-  }
+    const taskWord = cell.count === 1 ? "task" : "tasks";
+    tooltip.textContent = `${cell.count} ${taskWord} completed on ${formatted}`;
+    tooltip.classList.add("visible");
 
-  function renderDayLabels() {
-    dayLabels.innerHTML = "";
-    DAY_NAMES.forEach((name, i) => {
-      const label = document.createElement("div");
-      label.className = "heatmap-day-label";
-      if (!SHOWN_DAYS.includes(i)) {
-        label.classList.add("hidden-label");
-      }
-      label.textContent = SHOWN_DAYS.includes(i) ? name : "";
-      dayLabels.appendChild(label);
-    });
-  }
-
-  function renderGrid(days) {
-    grid.innerHTML = "";
-    monthLabels.innerHTML = "";
-
-    if (!days || days.length === 0) return;
-
-    const maxCount = Math.max(...days.map(d => d.count), 1);
-
-    // Organize days into weeks (columns)
-    // Each week column has 7 rows: Mon(0) through Sun(6)
-    const firstDate = new Date(days[0].date + "T00:00:00");
-    const firstDayOfWeek = (firstDate.getDay() + 6) % 7; // Convert Sun=0 to Mon=0 based
-
-    const weeks = [];
-    let currentWeek = new Array(7).fill(null);
-
-    // Fill leading empty cells
-    for (let i = 0; i < firstDayOfWeek; i++) {
-      currentWeek[i] = null;
-    }
-
-    let dayIndex = firstDayOfWeek;
-    for (const day of days) {
-      if (dayIndex === 7) {
-        weeks.push(currentWeek);
-        currentWeek = new Array(7).fill(null);
-        dayIndex = 0;
-      }
-      currentWeek[dayIndex] = day;
-      dayIndex++;
-    }
-    if (currentWeek.some(d => d !== null)) {
-      weeks.push(currentWeek);
-    }
-
-    // Set grid template columns
-    grid.style.gridTemplateColumns = `repeat(${weeks.length}, 1fr)`;
-
-    // Render month labels
-    let lastMonth = -1;
-    const monthPositions = [];
-    weeks.forEach((week, weekIdx) => {
-      const firstDayInWeek = week.find(d => d !== null);
-      if (firstDayInWeek) {
-        const date = new Date(firstDayInWeek.date + "T00:00:00");
-        const month = date.getMonth();
-        if (month !== lastMonth) {
-          monthPositions.push({ month, weekIdx });
-          lastMonth = month;
-        }
-      }
-    });
-
-    // Create month label containers
-    monthLabels.style.gridTemplateColumns = `repeat(${weeks.length}, 1fr)`;
-    for (let i = 0; i < weeks.length; i++) {
-      const label = document.createElement("div");
-      label.className = "heatmap-month-label";
-      const pos = monthPositions.find(p => p.weekIdx === i);
-      if (pos) {
-        label.textContent = MONTH_NAMES[pos.month];
-      }
-      monthLabels.appendChild(label);
-    }
-
-    // Render cells column by column (each column = 1 week)
-    for (let row = 0; row < 7; row++) {
-      for (let col = 0; col < weeks.length; col++) {
-        const day = weeks[col][row];
-        const cell = document.createElement("div");
-        if (day) {
-          const level = getLevel(day.count, maxCount);
-          cell.className = `heatmap-cell level-${level}`;
-          cell.title = `${formatDate(day.date)}: ${day.count} task${day.count !== 1 ? "s" : ""} completed`;
-
-          cell.addEventListener("mouseenter", () => showTooltip(cell, day));
-          cell.addEventListener("mouseleave", hideTooltip);
-        } else {
-          cell.className = "heatmap-cell empty";
-        }
-        grid.appendChild(cell);
-      }
-    }
-  }
-
-  // Tooltip
-  let tooltipEl = null;
-
-  function showTooltip(cell, day) {
-    hideTooltip();
-    tooltipEl = document.createElement("div");
-    tooltipEl.className = "heatmap-tooltip";
-    tooltipEl.innerHTML = `<strong>${day.count} task${day.count !== 1 ? "s" : ""}</strong> on ${formatDate(day.date)}`;
-
-    document.body.appendChild(tooltipEl);
-
-    const rect = cell.getBoundingClientRect();
-    const tipRect = tooltipEl.getBoundingClientRect();
-    let left = rect.left + rect.width / 2 - tipRect.width / 2;
-    let top = rect.top - tipRect.height - 8;
-
-    if (left < 8) left = 8;
-    if (left + tipRect.width > window.innerWidth - 8) {
-      left = window.innerWidth - tipRect.width - 8;
-    }
-    if (top < 8) {
-      top = rect.bottom + 8;
-    }
-
-    tooltipEl.style.left = `${left}px`;
-    tooltipEl.style.top = `${top}px`;
+    const rect = e.target.getBoundingClientRect();
+    tooltip.style.left = `${rect.left + rect.width / 2}px`;
+    tooltip.style.top = `${rect.top - 8}px`;
   }
 
   function hideTooltip() {
-    if (tooltipEl) {
-      tooltipEl.remove();
-      tooltipEl = null;
-    }
+    tooltip.classList.remove("visible");
   }
 
-  function updateStats(stats) {
-    document.getElementById("statCurrentStreak").textContent = stats.current_streak;
-    document.getElementById("statLongestStreak").textContent = stats.longest_streak;
-    document.getElementById("statTotalCompletions").textContent = stats.total_completions;
-  }
-
-  async function loadHeatmap() {
+  async function init() {
     try {
-      const res = await fetch("/api/analytics/heatmap?weeks=12");
-      if (!res.ok) throw new Error(res.statusText);
-      const data = await res.json();
+      const data = await HeatmapAPI.getData(WEEKS);
 
-      updateStats(data.stats);
+      currentStreakEl.textContent = data.current_streak;
+      longestStreakEl.textContent = data.longest_streak;
+      totalCompletionsEl.textContent = data.total_completions;
+
+      const { columns, monthMarkers } = buildGridData(data.daily_counts, data.end_date);
+
+      const allCounts = Object.values(data.daily_counts).map(Number);
+      const maxCount = allCounts.length > 0 ? Math.max(...allCounts) : 1;
+
       renderDayLabels();
-      renderGrid(data.days);
+      renderMonthLabels(monthMarkers, columns.length);
+      renderGrid(columns, maxCount);
     } catch (err) {
-      console.error("Failed to load heatmap:", err);
+      const errorDiv = document.createElement("div");
+      errorDiv.className = "error-feedback";
+      errorDiv.textContent = "Failed to load heatmap data. Please try again.";
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 3000);
     }
   }
 
-  loadHeatmap();
+  init();
 });

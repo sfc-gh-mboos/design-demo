@@ -46,7 +46,7 @@ def init_db():
     )
     migrate_add_columns(conn)
     count = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
-    if count == 0 and not os.environ.get("TESTING"):
+    if count == 0:
         generate_demo_data(conn)
     conn.commit()
     conn.close()
@@ -428,78 +428,64 @@ def analytics_trends():
 
 @app.route("/api/analytics/heatmap", methods=["GET"])
 def analytics_heatmap():
-    conn = get_db()
-    weeks = int(request.args.get("weeks", 12))
+    weeks = request.args.get("weeks", 12, type=int)
     weeks = max(1, min(weeks, 52))
 
-    today = datetime.now(timezone.utc).date()
-    # Align to start of the week containing (today - weeks * 7 days)
-    # Monday = 0
-    start_date = today - timedelta(days=today.weekday()) - timedelta(weeks=weeks - 1)
-    end_date = today
+    conn = get_db()
+    end_date = datetime.now(timezone.utc).date()
+    start_date = end_date - timedelta(weeks=weeks)
 
     rows = conn.execute(
-        """SELECT DATE(completed_at) as day, COUNT(*) as count
+        """SELECT DATE(completed_at) as date, COUNT(*) as count
            FROM tasks
            WHERE completed_at IS NOT NULL
              AND DATE(completed_at) >= ?
              AND DATE(completed_at) <= ?
            GROUP BY DATE(completed_at)
-           ORDER BY day""",
+           ORDER BY DATE(completed_at)""",
         (start_date.isoformat(), end_date.isoformat()),
     ).fetchall()
-    counts_by_day = {r["day"]: r["count"] for r in rows}
 
-    # Build day-by-day list from start_date to end_date
-    days = []
-    d = start_date
-    while d <= end_date:
-        days.append({"date": d.isoformat(), "count": counts_by_day.get(d.isoformat(), 0)})
-        d += timedelta(days=1)
+    daily_counts = {row["date"]: row["count"] for row in rows}
 
-    # All-time completion data for streak calculations
-    all_days_rows = conn.execute(
-        """SELECT DISTINCT DATE(completed_at) as day
+    all_completed = conn.execute(
+        """SELECT DATE(completed_at) as date
            FROM tasks
            WHERE completed_at IS NOT NULL
-           ORDER BY day DESC"""
+           ORDER BY DATE(completed_at) DESC"""
     ).fetchall()
     conn.close()
 
-    completed_dates = set(r["day"] for r in all_days_rows)
-    total_completions = sum(d["count"] for d in days)
+    completed_set = set(r["date"] for r in all_completed)
+    conn.close()
 
-    # Current streak: consecutive days ending today or yesterday with completions
     current_streak = 0
-    check = today
-    if today.isoformat() not in completed_dates:
-        check = today - timedelta(days=1)
-    while check.isoformat() in completed_dates:
+    check = end_date
+    while check.isoformat() in completed_set:
         current_streak += 1
         check -= timedelta(days=1)
 
-    # Longest streak
     longest_streak = 0
-    if completed_dates:
-        sorted_dates = sorted(completed_dates)
-        streak = 1
-        for i in range(1, len(sorted_dates)):
-            prev = datetime.strptime(sorted_dates[i - 1], "%Y-%m-%d").date()
-            curr = datetime.strptime(sorted_dates[i], "%Y-%m-%d").date()
-            if (curr - prev).days == 1:
-                streak += 1
-            else:
-                longest_streak = max(longest_streak, streak)
-                streak = 1
+    streak = 0
+    prev = None
+    for d in sorted(completed_set):
+        dt = datetime.strptime(d, "%Y-%m-%d").date()
+        if prev and (dt - prev).days == 1:
+            streak += 1
+        else:
+            streak = 1
         longest_streak = max(longest_streak, streak)
+        prev = dt
+
+    total_completions = len(all_completed)
 
     return jsonify({
-        "stats": {
-            "current_streak": current_streak,
-            "longest_streak": longest_streak,
-            "total_completions": total_completions,
-        },
-        "days": days,
+        "daily_counts": daily_counts,
+        "current_streak": current_streak,
+        "longest_streak": longest_streak,
+        "total_completions": total_completions,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
     })
 
 
