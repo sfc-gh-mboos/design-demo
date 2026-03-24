@@ -1,38 +1,22 @@
-"""Pytest fixtures for design-demo tests."""
+import pytest
 import os
+import sys
 import tempfile
 
-import pytest
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-
-@pytest.fixture(scope="session")
-def test_db_path():
-    fd, path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-    yield path
-    try:
-        os.unlink(path)
-    except OSError:
-        pass
+import server
 
 
 @pytest.fixture
-def app(test_db_path):
-    """Flask app with test DB seeded with deterministic demo data."""
-    os.environ["TESTING"] = "1"
-    import server
-
-    server.DB_PATH = test_db_path
-
+def app():
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    server.DB_PATH = db_path
+    server.app.config["TESTING"] = True
     server.init_db()
-    conn = server.get_db()
-    from data.demo_seed import generate_demo_data
-
-    generate_demo_data(conn)
-    conn.commit()
-    conn.close()
-
-    return server.app
+    yield server.app
+    os.close(db_fd)
+    os.unlink(db_path)
 
 
 @pytest.fixture
