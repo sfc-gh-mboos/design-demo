@@ -457,7 +457,6 @@ def analytics_heatmap():
     conn.close()
 
     completed_set = set(r["date"] for r in all_completed)
-    conn.close()
 
     current_streak = 0
     check = end_date
