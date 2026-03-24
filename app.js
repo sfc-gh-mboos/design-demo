@@ -132,7 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Add drag event listeners
     item.addEventListener("dragstart", handleDragStart);
     item.addEventListener("dragend", handleDragEnd);
-    
+
     return item;
   }
 
@@ -175,8 +175,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
     
-    // Set up drop zones once (or re-setup if needed)
-    if (!columnDropZonesSetup || state.view === "board") {
+    // Set up drop zones once
+    if (!columnDropZonesSetup) {
       setupAllColumnDropZones();
       columnDropZonesSetup = true;
     }
@@ -244,30 +244,26 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function setupColumnDropZone(columnNode, status) {
-    // Remove existing event listeners by replacing with a clone
-    const newColumn = columnNode.cloneNode(true);
-    columnNode.parentNode.replaceChild(newColumn, columnNode);
-    
-    const bodyNode = newColumn.querySelector(`[data-column-body="${status}"]`);
-    
-    newColumn.addEventListener("dragover", (e) => {
+    if (columnNode._dropZoneReady) return;
+    columnNode._dropZoneReady = true;
+
+    columnNode.addEventListener("dragover", (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
-      newColumn.classList.add("drag-over");
+      columnNode.classList.add("drag-over");
     });
     
-    newColumn.addEventListener("dragleave", (e) => {
-      // Only remove drag-over if we're actually leaving the column
-      if (!newColumn.contains(e.relatedTarget)) {
-        newColumn.classList.remove("drag-over");
+    columnNode.addEventListener("dragleave", (e) => {
+      if (!columnNode.contains(e.relatedTarget)) {
+        columnNode.classList.remove("drag-over");
       }
     });
     
-    newColumn.addEventListener("drop", async (e) => {
+    columnNode.addEventListener("drop", async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      newColumn.classList.remove("drag-over");
-      
+      columnNode.classList.remove("drag-over");
+
       if (!draggedTask || draggedTask.status === status) {
         return; // No change needed
       }
