@@ -153,6 +153,25 @@ def get_tasks():
     return jsonify([row_to_dict(r) for r in rows])
 
 
+@app.route("/api/tasks", methods=["POST"])
+def create_task():
+    data = request.get_json(silent=True) or {}
+    title = normalize_title(data.get("title"))
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+    category = data.get("category", "Planning").strip() or "Planning"
+    priority = normalize_priority(data.get("priority")) or "medium"
+    conn = get_db()
+    cursor = conn.execute(
+        "INSERT INTO tasks (title, status, category, priority) VALUES (?, 'todo', ?, ?)",
+        (title, category, priority),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    conn.close()
+    return jsonify(row_to_dict(row)), 201
+
+
 @app.route("/api/tasks/<int:task_id>", methods=["PUT"])
 def update_task(task_id):
     data = request.get_json(silent=True) or {}
@@ -426,6 +445,16 @@ def analytics_trends():
     return jsonify(data["trends"])
 
 
+@app.route("/analytics")
+def analytics_page():
+    return send_from_directory(".", "analytics.html")
+
+
+@app.route("/heatmap")
+def heatmap_page():
+    return send_from_directory(".", "heatmap.html")
+
+
 @app.route("/api/analytics/heatmap", methods=["GET"])
 def analytics_heatmap():
     weeks = request.args.get("weeks", 12, type=int)
@@ -436,67 +465,66 @@ def analytics_heatmap():
     start_date = end_date - timedelta(weeks=weeks)
 
     rows = conn.execute(
-        """SELECT DATE(completed_at) as date, COUNT(*) as count
-           FROM tasks
-           WHERE completed_at IS NOT NULL
-             AND DATE(completed_at) >= ?
-             AND DATE(completed_at) <= ?
-           GROUP BY DATE(completed_at)
-           ORDER BY DATE(completed_at)""",
+        "SELECT DATE(completed_at) as day, COUNT(*) as count "
+        "FROM tasks WHERE completed_at IS NOT NULL "
+        "AND DATE(completed_at) >= ? AND DATE(completed_at) <= ? "
+        "GROUP BY DATE(completed_at) ORDER BY day",
         (start_date.isoformat(), end_date.isoformat()),
     ).fetchall()
 
-    daily_counts = {row["date"]: row["count"] for row in rows}
+    daily_counts = {row["day"]: row["count"] for row in rows}
 
     all_completed = conn.execute(
-        """SELECT DATE(completed_at) as date
-           FROM tasks
-           WHERE completed_at IS NOT NULL
-           ORDER BY DATE(completed_at) DESC"""
+        "SELECT DATE(completed_at) as day FROM tasks "
+        "WHERE completed_at IS NOT NULL ORDER BY day"
     ).fetchall()
     conn.close()
 
-    completed_set = set(r["date"] for r in all_completed)
-    conn.close()
+    completed_dates = sorted(set(r["day"] for r in all_completed if r["day"]))
+    total_completions = sum(daily_counts.values())
 
     current_streak = 0
     check = end_date
-    while check.isoformat() in completed_set:
-        current_streak += 1
+    while check.isoformat() in daily_counts or (
+        check == end_date and check.isoformat() not in daily_counts
+    ):
+        if check.isoformat() in daily_counts:
+            current_streak += 1
+        elif check == end_date:
+            check -= timedelta(days=1)
+            continue
+        else:
+            break
         check -= timedelta(days=1)
 
     longest_streak = 0
     streak = 0
     prev = None
-    for d in sorted(completed_set):
-        dt = datetime.strptime(d, "%Y-%m-%d").date()
-        if prev and (dt - prev).days == 1:
+    for d_str in completed_dates:
+        d = datetime.strptime(d_str, "%Y-%m-%d").date()
+        if prev and (d - prev).days == 1:
             streak += 1
         else:
             streak = 1
         longest_streak = max(longest_streak, streak)
-        prev = dt
+        prev = d
 
-    total_completions = len(all_completed)
+    days = []
+    cursor = start_date
+    while cursor <= end_date:
+        iso = cursor.isoformat()
+        days.append({"date": iso, "count": daily_counts.get(iso, 0)})
+        cursor += timedelta(days=1)
 
     return jsonify({
-        "daily_counts": daily_counts,
-        "current_streak": current_streak,
-        "longest_streak": longest_streak,
-        "total_completions": total_completions,
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
+        "days": days,
+        "stats": {
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "total_completions": total_completions,
+        },
+        "weeks": weeks,
     })
-
-
-@app.route("/analytics")
-def analytics_page():
-    return send_from_directory(".", "analytics.html")
-
-
-@app.route("/heatmap")
-def heatmap_page():
-    return send_from_directory(".", "heatmap.html")
 
 
 if __name__ == "__main__":
