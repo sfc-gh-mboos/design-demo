@@ -16,6 +16,8 @@
       </div>
       <nav class="topbar-nav">
         <a href="/" class="nav-link active">Tasks</a>
+        <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/heatmap" class="nav-link">Heatmap</a>
       </nav>
     </div>
   </header>
@@ -47,6 +49,7 @@
         <button class="view-toggle-btn" type="button" data-view="board" role="tab" aria-selected="false">Board</button>
       </div>
       <span class="task-count" id="taskCount"></span>
+      <button class="add-task-btn" id="addTaskBtn" type="button" aria-label="Add task">+ Add Task</button>
     </div>
 
     <section class="list-view" id="listView" aria-label="Task list">
@@ -79,6 +82,40 @@
       </article>
     </section>
   </main>
+
+  <div class="modal-overlay hidden" id="addTaskModal">
+    <div class="modal" role="dialog" aria-labelledby="modalTitle" aria-modal="true">
+      <header class="modal-header">
+        <h2 id="modalTitle" class="modal-title">New Task</h2>
+        <button class="modal-close" id="modalClose" type="button" aria-label="Close">&times;</button>
+      </header>
+      <form id="addTaskForm" class="modal-body">
+        <label class="form-label" for="taskTitleInput">Description</label>
+        <input
+          id="taskTitleInput"
+          class="form-input"
+          type="text"
+          placeholder="What needs to be done?"
+          required
+          autocomplete="off"
+        >
+        <label class="form-label" for="taskCategorySelect">Category</label>
+        <select id="taskCategorySelect" class="form-select">
+          <option value="Planning">Planning</option>
+          <option value="Design">Design</option>
+          <option value="Engineering">Engineering</option>
+          <option value="Operations">Operations</option>
+        </select>
+        <label class="form-label" for="taskPrioritySelect">Priority</label>
+        <select id="taskPrioritySelect" class="form-select">
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
+        <button type="submit" class="form-submit">Add Task</button>
+      </form>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

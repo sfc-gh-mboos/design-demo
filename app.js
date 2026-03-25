@@ -39,6 +39,19 @@ document.addEventListener("DOMContentLoaded", () => {
       return res.json();
     },
 
+    async create(data) {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(error.error || `Failed to create task: ${res.statusText}`);
+      }
+      return res.json();
+    },
+
     async remove(id) {
       const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
       if (!res.ok) {
@@ -132,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Add drag event listeners
     item.addEventListener("dragstart", handleDragStart);
     item.addEventListener("dragend", handleDragEnd);
-    
+
     return item;
   }
 
@@ -175,8 +188,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
     
-    // Set up drop zones once (or re-setup if needed)
-    if (!columnDropZonesSetup || state.view === "board") {
+    // Set up drop zones once
+    if (!columnDropZonesSetup) {
       setupAllColumnDropZones();
       columnDropZonesSetup = true;
     }
@@ -244,30 +257,26 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function setupColumnDropZone(columnNode, status) {
-    // Remove existing event listeners by replacing with a clone
-    const newColumn = columnNode.cloneNode(true);
-    columnNode.parentNode.replaceChild(newColumn, columnNode);
-    
-    const bodyNode = newColumn.querySelector(`[data-column-body="${status}"]`);
-    
-    newColumn.addEventListener("dragover", (e) => {
+    if (columnNode._dropZoneReady) return;
+    columnNode._dropZoneReady = true;
+
+    columnNode.addEventListener("dragover", (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
-      newColumn.classList.add("drag-over");
+      columnNode.classList.add("drag-over");
     });
     
-    newColumn.addEventListener("dragleave", (e) => {
-      // Only remove drag-over if we're actually leaving the column
-      if (!newColumn.contains(e.relatedTarget)) {
-        newColumn.classList.remove("drag-over");
+    columnNode.addEventListener("dragleave", (e) => {
+      if (!columnNode.contains(e.relatedTarget)) {
+        columnNode.classList.remove("drag-over");
       }
     });
     
-    newColumn.addEventListener("drop", async (e) => {
+    columnNode.addEventListener("drop", async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      newColumn.classList.remove("drag-over");
-      
+      columnNode.classList.remove("drag-over");
+
       if (!draggedTask || draggedTask.status === status) {
         return; // No change needed
       }
@@ -360,6 +369,54 @@ document.addEventListener("DOMContentLoaded", () => {
   searchInput.addEventListener("input", (e) => {
     state.searchQuery = e.target.value || "";
     render();
+  });
+
+  // --- Add Task Modal ---
+
+  const addTaskBtn = document.getElementById("addTaskBtn");
+  const addTaskModal = document.getElementById("addTaskModal");
+  const addTaskForm = document.getElementById("addTaskForm");
+  const modalClose = document.getElementById("modalClose");
+  const taskTitleInput = document.getElementById("taskTitleInput");
+
+  function openModal() {
+    addTaskModal.classList.remove("hidden");
+    taskTitleInput.focus();
+  }
+
+  function closeModal() {
+    addTaskModal.classList.add("hidden");
+    addTaskForm.reset();
+  }
+
+  addTaskBtn.addEventListener("click", openModal);
+  modalClose.addEventListener("click", closeModal);
+
+  addTaskModal.addEventListener("click", (e) => {
+    if (e.target === addTaskModal) closeModal();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !addTaskModal.classList.contains("hidden")) {
+      closeModal();
+    }
+  });
+
+  addTaskForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const title = taskTitleInput.value.trim();
+    if (!title) return;
+
+    const category = document.getElementById("taskCategorySelect").value;
+    const priority = document.getElementById("taskPrioritySelect").value;
+
+    try {
+      await TaskAPI.create({ title, category, priority });
+      closeModal();
+      await loadTasks();
+    } catch (err) {
+      showErrorFeedback(err.message || "Failed to add task.");
+    }
   });
 
   // --- Init ---

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics Dashboard - Taskflow</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/analytics" class="nav-link active">Analytics</a>
+        <a href="/heatmap" class="nav-link">Heatmap</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="analytics-container">
+    <section class="hero">
+      <h1>Analytics Dashboard</h1>
+      <p class="subtitle">Understand your productivity patterns and make data-driven decisions</p>
+    </section>
+
+    <div class="cohort-filter-wrapper">
+      <div class="filter-row">
+        <label for="cohortFilter" class="cohort-filter-label">Filter by Cohort:</label>
+        <select id="cohortFilter" class="cohort-filter">
+          <option value="all">All Users</option>
+          <option value="power_users">Power Users</option>
+          <option value="new_users">New Users</option>
+          <option value="enterprise">Enterprise</option>
+          <option value="team_alpha">Team Alpha</option>
+          <option value="team_beta">Team Beta</option>
+        </select>
+      </div>
+      <div class="filter-row date-filter-row">
+        <label class="date-filter-label">Date Range:</label>
+        <div class="date-presets">
+          <button type="button" class="date-preset-btn active" data-days="7">7d</button>
+          <button type="button" class="date-preset-btn" data-days="30">30d</button>
+          <button type="button" class="date-preset-btn" data-days="90">90d</button>
+          <button type="button" class="date-preset-btn" data-days="all">All</button>
+        </div>
+        <div class="date-inputs">
+          <input type="date" id="startDate" class="date-input" aria-label="Start date">
+          <span class="date-separator">–</span>
+          <input type="date" id="endDate" class="date-input" aria-label="End date">
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpiCompletionRate">--</div>
+        <div class="kpi-label">Completion Rate</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpiTasksWeek">--</div>
+        <div class="kpi-label">Tasks This Week</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpiStreak">--</div>
+        <div class="kpi-label">Streak (Days)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpiHighPriority">--</div>
+        <div class="kpi-label">High-Priority Completion</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3 class="chart-title">Task Distribution by Category</h3>
+        <canvas id="categoryChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3 class="chart-title">Task Distribution by Priority</h3>
+        <canvas id="priorityChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3 class="chart-title">Weekly Progress</h3>
+        <canvas id="weeklyProgressChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3 class="chart-title">Priority Focus Over Time</h3>
+        <canvas id="priorityFocusChart"></canvas>
+      </div>
+      <div class="chart-card chart-card-full">
+        <h3 class="chart-title">Daily Task Volume</h3>
+        <canvas id="dailyVolumeChart"></canvas>
+      </div>
+      <div class="chart-card chart-card-full">
+        <h3 class="chart-title">Productivity Score Trend</h3>
+        <canvas id="productivityScoreChart"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <script src="analytics.js"></script>
+</body>
+</html>
