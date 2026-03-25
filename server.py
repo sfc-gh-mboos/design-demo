@@ -159,7 +159,7 @@ def create_task():
     title = normalize_title(data.get("title"))
     if not title:
         return jsonify({"error": "title is required"}), 400
-    category = data.get("category", "Planning").strip() or "Planning"
+    category = str(data.get("category") or "Planning").strip() or "Planning"
     priority = normalize_priority(data.get("priority")) or "medium"
     conn = get_db()
     cursor = conn.execute(
