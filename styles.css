@@ -525,6 +525,172 @@ body {
 
 }
 
+/* ---- Add Task button ---- */
+
+.add-task-btn {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  padding: 7px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.add-task-btn:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 2px 8px rgba(245, 78, 0, 0.25);
+}
+
+.add-task-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+/* ---- Modal ---- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(38, 37, 30, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 440px;
+  margin: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  animation: scaleIn 0.2s ease;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+}
+
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+.modal-close {
+  border: none;
+  background: none;
+  font-size: 1.4rem;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.modal-close:hover {
+  color: var(--fg);
+}
+
+.modal-body {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: -6px;
+}
+
+.form-input,
+.form-select {
+  border: 1px solid var(--divider);
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  color: var(--fg);
+  font-family: inherit;
+  width: 100%;
+}
+
+.form-input::placeholder {
+  color: var(--fg-secondary);
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(245, 78, 0, 0.12);
+}
+
+.form-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2326251e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+.form-submit {
+  margin-top: 4px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  padding: 11px 20px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-submit:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 2px 8px rgba(245, 78, 0, 0.25);
+}
+
+.form-submit:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 /* ---- Error feedback ---- */
 
 .error-feedback {
@@ -560,6 +726,10 @@ body {
   max-width: 960px;
   margin: 0 auto;
   padding: 0 24px 80px;
+}
+
+.analytics-container .hero h1 {
+  text-align: left;
 }
 
 .cohort-filter-wrapper {
@@ -792,21 +962,16 @@ body {
   max-width: 960px;
   margin: 0 auto;
   padding: 32px 50px 80px;
-  background: #fff;
-  min-height: calc(100vh - 50px);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .heatmap-header {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .heatmap-title {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-weight: 500;
   font-size: 20px;
+  font-weight: 500;
   line-height: 30px;
   color: #0a0a0a;
   letter-spacing: -0.45px;
@@ -815,7 +980,7 @@ body {
 .heatmap-stats {
   display: flex;
   gap: 32px;
-  align-items: flex-start;
+  margin-bottom: 24px;
 }
 
 .heatmap-stat {
@@ -825,9 +990,8 @@ body {
 }
 
 .heatmap-stat-label {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-weight: 400;
   font-size: 14px;
+  font-weight: 400;
   line-height: 20px;
   color: #717182;
   letter-spacing: -0.15px;
@@ -840,18 +1004,16 @@ body {
 }
 
 .heatmap-stat-number {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-weight: 500;
   font-size: 30px;
+  font-weight: 500;
   line-height: 36px;
   color: #0a0a0a;
   letter-spacing: 0.4px;
 }
 
 .heatmap-stat-unit {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-weight: 500;
   font-size: 20px;
+  font-weight: 500;
   line-height: 28px;
   color: #0a0a0a;
   letter-spacing: -0.45px;
@@ -875,22 +1037,18 @@ body {
 .heatmap-day-labels {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-top: 28px;
-  flex-shrink: 0;
+  justify-content: flex-end;
   width: 33px;
+  flex-shrink: 0;
+  gap: 4px;
+  padding-bottom: 0;
 }
 
 .heatmap-day-label {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-weight: 400;
   font-size: 12px;
+  font-weight: 400;
   line-height: 16px;
   color: #717182;
-  display: flex;
-  align-items: center;
-  height: 0;
-  flex: 1;
 }
 
 .heatmap-grid-area {
@@ -907,11 +1065,11 @@ body {
 }
 
 .heatmap-month-label {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-weight: 400;
   font-size: 12px;
+  font-weight: 400;
   line-height: 16px;
   color: #717182;
+  padding-top: 1px;
 }
 
 .heatmap-grid {
@@ -928,109 +1086,127 @@ body {
 .heatmap-cell {
   aspect-ratio: 1;
   border-radius: 6px;
-  cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  transition: transform 0.1s ease;
+  cursor: default;
 }
 
 .heatmap-cell:hover {
   transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   z-index: 1;
-  position: relative;
 }
 
-.heatmap-cell-empty {
+.heatmap-cell[data-level="empty"] {
   visibility: hidden;
 }
 
-.heatmap-level-0 {
+.heatmap-cell[data-level="0"] {
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-.heatmap-level-1 {
+.heatmap-cell[data-level="1"] {
   background: rgba(245, 78, 0, 0.15);
 }
 
-.heatmap-level-2 {
+.heatmap-cell[data-level="2"] {
   background: rgba(245, 78, 0, 0.3);
 }
 
-.heatmap-level-3 {
+.heatmap-cell[data-level="3"] {
   background: rgba(245, 78, 0, 0.5);
 }
 
-.heatmap-level-4 {
+.heatmap-cell[data-level="4"] {
   background: rgba(245, 78, 0, 0.7);
 }
 
-.heatmap-level-5 {
+.heatmap-cell[data-level="5"] {
   background: #f54e00;
 }
 
 .heatmap-legend {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 8px;
 }
 
 .heatmap-legend-text {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-weight: 400;
   font-size: 12px;
+  font-weight: 400;
   line-height: 16px;
   color: #717182;
+  padding-top: 1px;
 }
 
-.heatmap-legend-blocks {
+.heatmap-legend-scale {
   display: flex;
   gap: 4px;
-  align-items: center;
 }
 
-.heatmap-legend-block {
+.heatmap-legend-cell {
   width: 16px;
   height: 16px;
   border-radius: 6px;
+}
+
+.heatmap-legend-cell[data-level="0"] {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.heatmap-legend-cell[data-level="1"] {
+  background: rgba(245, 78, 0, 0.15);
+}
+
+.heatmap-legend-cell[data-level="2"] {
+  background: rgba(245, 78, 0, 0.3);
+}
+
+.heatmap-legend-cell[data-level="3"] {
+  background: rgba(245, 78, 0, 0.5);
+}
+
+.heatmap-legend-cell[data-level="4"] {
+  background: rgba(245, 78, 0, 0.7);
+}
+
+.heatmap-legend-cell[data-level="5"] {
+  background: #f54e00;
 }
 
 .heatmap-tooltip {
   position: fixed;
   background: #0a0a0a;
   color: #fff;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 16px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 6px;
   pointer-events: none;
   opacity: 0;
   transform: translateX(-50%) translateY(-100%);
   transition: opacity 0.15s ease;
-  z-index: 100;
   white-space: nowrap;
+  z-index: 100;
 }
 
 .heatmap-tooltip.visible {
   opacity: 1;
 }
 
-.heatmap-tooltip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: #0a0a0a;
+.heatmap-error {
+  font-size: 14px;
+  color: #717182;
+  text-align: center;
+  padding: 40px 0;
 }
 
 /* ---- Heatmap Responsive ---- */
 
 @media (max-width: 768px) {
   .heatmap-container {
-    padding: 24px 24px 80px;
+    padding: 24px 24px 60px;
   }
 
   .heatmap-stats {
@@ -1040,30 +1216,23 @@ body {
 
 @media (max-width: 520px) {
   .heatmap-container {
-    padding: 16px 16px 80px;
+    padding: 16px 16px 40px;
   }
 
   .heatmap-stats {
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 16px;
   }
 
-  .heatmap-stat-number {
-    font-size: 24px;
-    line-height: 30px;
-  }
-
-  .heatmap-stat-unit {
-    font-size: 16px;
-    line-height: 22px;
+  .heatmap-card {
+    padding: 16px;
   }
 
   .heatmap-day-labels {
-    width: 26px;
+    width: 24px;
   }
 
   .heatmap-day-label {
     font-size: 10px;
   }
 }
-

@@ -39,6 +39,19 @@ document.addEventListener("DOMContentLoaded", () => {
       return res.json();
     },
 
+    async create(data) {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(error.error || `Failed to create task: ${res.statusText}`);
+      }
+      return res.json();
+    },
+
     async remove(id) {
       const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
       if (!res.ok) {
@@ -356,6 +369,54 @@ document.addEventListener("DOMContentLoaded", () => {
   searchInput.addEventListener("input", (e) => {
     state.searchQuery = e.target.value || "";
     render();
+  });
+
+  // --- Add Task Modal ---
+
+  const addTaskBtn = document.getElementById("addTaskBtn");
+  const addTaskModal = document.getElementById("addTaskModal");
+  const addTaskForm = document.getElementById("addTaskForm");
+  const modalClose = document.getElementById("modalClose");
+  const taskTitleInput = document.getElementById("taskTitleInput");
+
+  function openModal() {
+    addTaskModal.classList.remove("hidden");
+    taskTitleInput.focus();
+  }
+
+  function closeModal() {
+    addTaskModal.classList.add("hidden");
+    addTaskForm.reset();
+  }
+
+  addTaskBtn.addEventListener("click", openModal);
+  modalClose.addEventListener("click", closeModal);
+
+  addTaskModal.addEventListener("click", (e) => {
+    if (e.target === addTaskModal) closeModal();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !addTaskModal.classList.contains("hidden")) {
+      closeModal();
+    }
+  });
+
+  addTaskForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const title = taskTitleInput.value.trim();
+    if (!title) return;
+
+    const category = document.getElementById("taskCategorySelect").value;
+    const priority = document.getElementById("taskPrioritySelect").value;
+
+    try {
+      await TaskAPI.create({ title, category, priority });
+      closeModal();
+      await loadTasks();
+    } catch (err) {
+      showErrorFeedback(err.message || "Failed to add task.");
+    }
   });
 
   // --- Init ---
