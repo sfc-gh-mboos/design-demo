@@ -458,72 +458,95 @@ def heatmap_page():
 @app.route("/api/analytics/heatmap", methods=["GET"])
 def analytics_heatmap():
     weeks = request.args.get("weeks", 12, type=int)
-    weeks = max(1, min(weeks, 52))
+    weeks = max(1, min(52, weeks))
 
     conn = get_db()
-    end_date = datetime.now(timezone.utc).date()
-    start_date = end_date - timedelta(weeks=weeks)
-
     rows = conn.execute(
-        "SELECT DATE(completed_at) as day, COUNT(*) as count "
-        "FROM tasks WHERE completed_at IS NOT NULL "
-        "AND DATE(completed_at) >= ? AND DATE(completed_at) <= ? "
-        "GROUP BY DATE(completed_at) ORDER BY day",
-        (start_date.isoformat(), end_date.isoformat()),
-    ).fetchall()
-
-    daily_counts = {row["day"]: row["count"] for row in rows}
-
-    all_completed = conn.execute(
-        "SELECT DATE(completed_at) as day FROM tasks "
-        "WHERE completed_at IS NOT NULL ORDER BY day"
+        "SELECT DATE(completed_at) AS completion_date, COUNT(*) AS count "
+        "FROM tasks WHERE status = 'done' AND completed_at IS NOT NULL "
+        "GROUP BY DATE(completed_at)"
     ).fetchall()
     conn.close()
 
-    completed_dates = sorted(set(r["day"] for r in all_completed if r["day"]))
-    total_completions = sum(daily_counts.values())
+    completions = {}
+    for row in rows:
+        completions[row["completion_date"]] = row["count"]
+
+    today = datetime.now(timezone.utc).date()
+    days_since_monday = today.weekday()
+    current_week_start = today - timedelta(days=days_since_monday)
+
+    all_counts = []
+    weeks_data = []
+
+    for w in range(weeks - 1, -1, -1):
+        week_start = current_week_start - timedelta(weeks=w)
+        days = []
+        for d in range(7):
+            day_date = week_start + timedelta(days=d)
+            date_str = day_date.strftime("%Y-%m-%d")
+            count = completions.get(date_str, 0)
+            is_future = day_date > today
+            if not is_future:
+                all_counts.append(count)
+            days.append({"date": date_str, "count": count, "future": is_future})
+        weeks_data.append({"week_start": week_start.strftime("%Y-%m-%d"), "days": days})
+
+    non_zero = [c for c in all_counts if c > 0]
+    max_count = max(non_zero) if non_zero else 0
+
+    for week in weeks_data:
+        for day in week["days"]:
+            if day["future"]:
+                day["level"] = -1
+            elif day["count"] == 0:
+                day["level"] = 0
+            elif max_count > 0:
+                ratio = day["count"] / max_count
+                if ratio <= 0.2:
+                    day["level"] = 1
+                elif ratio <= 0.4:
+                    day["level"] = 2
+                elif ratio <= 0.6:
+                    day["level"] = 3
+                elif ratio <= 0.8:
+                    day["level"] = 4
+                else:
+                    day["level"] = 5
+            else:
+                day["level"] = 0
+
+    total_completions = sum(all_counts)
 
     current_streak = 0
-    check = end_date
-    while check.isoformat() in daily_counts or (
-        check == end_date and check.isoformat() not in daily_counts
-    ):
-        if check.isoformat() in daily_counts:
+    check_date = today
+    while True:
+        date_str = check_date.strftime("%Y-%m-%d")
+        if completions.get(date_str, 0) > 0:
             current_streak += 1
-        elif check == end_date:
-            check -= timedelta(days=1)
-            continue
+            check_date -= timedelta(days=1)
         else:
             break
-        check -= timedelta(days=1)
 
     longest_streak = 0
-    streak = 0
-    prev = None
-    for d_str in completed_dates:
-        d = datetime.strptime(d_str, "%Y-%m-%d").date()
-        if prev and (d - prev).days == 1:
-            streak += 1
-        else:
-            streak = 1
-        longest_streak = max(longest_streak, streak)
-        prev = d
-
-    days = []
-    cursor = start_date
-    while cursor <= end_date:
-        iso = cursor.isoformat()
-        days.append({"date": iso, "count": daily_counts.get(iso, 0)})
-        cursor += timedelta(days=1)
+    if completions:
+        sorted_dates = sorted(completions.keys())
+        streak = 0
+        prev_date = None
+        for date_str in sorted_dates:
+            d = datetime.strptime(date_str, "%Y-%m-%d").date()
+            if prev_date and (d - prev_date).days == 1:
+                streak += 1
+            else:
+                streak = 1
+            longest_streak = max(longest_streak, streak)
+            prev_date = d
 
     return jsonify({
-        "days": days,
-        "stats": {
-            "current_streak": current_streak,
-            "longest_streak": longest_streak,
-            "total_completions": total_completions,
-        },
-        "weeks": weeks,
+        "current_streak": current_streak,
+        "longest_streak": longest_streak,
+        "total_completions": total_completions,
+        "weeks": weeks_data,
     })
 
 
