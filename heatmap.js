@@ -40,8 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("longestStreak").textContent = longest_streak;
     document.getElementById("totalCompletions").textContent = total_completions;
 
-    const start = new Date(start_date + "T00:00:00");
-    const end = new Date(end_date + "T00:00:00");
+    const start = new Date(start_date + "T00:00:00Z");
+    const end = new Date(end_date + "T00:00:00Z");
 
     const maxCount = Math.max(1, ...Object.values(daily_counts));
 
@@ -71,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const monthPositions = new Map();
     weeks.forEach((week, wi) => {
       const firstDay = week[0];
-      const dt = new Date(firstDay.date + "T00:00:00");
+      const dt = new Date(firstDay.date + "T00:00:00Z");
       const monthKey = `${dt.getFullYear()}-${dt.getMonth()}`;
       if (!monthPositions.has(monthKey)) {
         monthPositions.set(monthKey, { col: wi, month: dt.getMonth() });
@@ -133,7 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!date) return;
 
     const tooltip = document.getElementById("heatmapTooltip");
-    const d = new Date(date + "T00:00:00");
+    const d = new Date(date + "T00:00:00Z");
     const formatted = d.toLocaleDateString("en-US", {
       weekday: "short", month: "short", day: "numeric", year: "numeric"
     });
