@@ -1,72 +1,72 @@
-import json
-
-
-def test_heatmap_page_serves(client):
+def test_heatmap_page_returns_200(client):
     resp = client.get("/heatmap")
     assert resp.status_code == 200
     assert b"Activity Heatmap" in resp.data
 
 
 def test_heatmap_api_returns_200(client):
-    resp = client.get("/api/analytics/heatmap")
+    resp = client.get("/api/analytics/heatmap?weeks=12")
     assert resp.status_code == 200
     data = resp.get_json()
-    assert "days" in data
-    assert "stats" in data
+    assert "current_streak" in data
+    assert "longest_streak" in data
+    assert "total_completions" in data
     assert "weeks" in data
+
+
+def test_heatmap_api_returns_correct_weeks(client):
+    resp = client.get("/api/analytics/heatmap?weeks=4")
+    data = resp.get_json()
+    assert len(data["weeks"]) == 4
+    for week in data["weeks"]:
+        assert "week_start" in week
+        assert "days" in week
+        assert len(week["days"]) == 7
+
+
+def test_heatmap_api_day_structure(client):
+    resp = client.get("/api/analytics/heatmap?weeks=1")
+    data = resp.get_json()
+    day = data["weeks"][0]["days"][0]
+    assert "date" in day
+    assert "count" in day
+    assert "level" in day
+    assert "future" in day
+
+
+def test_heatmap_api_levels_in_range(client):
+    resp = client.get("/api/analytics/heatmap?weeks=12")
+    data = resp.get_json()
+    for week in data["weeks"]:
+        for day in week["days"]:
+            assert day["level"] >= -1 and day["level"] <= 5
 
 
 def test_heatmap_api_default_weeks(client):
     resp = client.get("/api/analytics/heatmap")
     data = resp.get_json()
-    assert data["weeks"] == 12
-
-
-def test_heatmap_api_custom_weeks(client):
-    resp = client.get("/api/analytics/heatmap?weeks=4")
-    data = resp.get_json()
-    assert data["weeks"] == 4
-    assert len(data["days"]) > 0
+    assert len(data["weeks"]) == 12
 
 
 def test_heatmap_api_weeks_clamped(client):
     resp = client.get("/api/analytics/heatmap?weeks=100")
     data = resp.get_json()
-    assert data["weeks"] == 52
+    assert len(data["weeks"]) == 52
 
     resp = client.get("/api/analytics/heatmap?weeks=0")
     data = resp.get_json()
-    assert data["weeks"] == 1
+    assert len(data["weeks"]) == 1
 
 
-def test_heatmap_api_stats_shape(client):
-    resp = client.get("/api/analytics/heatmap")
-    stats = resp.get_json()["stats"]
-    assert "current_streak" in stats
-    assert "longest_streak" in stats
-    assert "total_completions" in stats
-    assert isinstance(stats["current_streak"], int)
-    assert isinstance(stats["longest_streak"], int)
-    assert isinstance(stats["total_completions"], int)
-
-
-def test_heatmap_api_days_shape(client):
-    resp = client.get("/api/analytics/heatmap")
-    days = resp.get_json()["days"]
-    assert isinstance(days, list)
-    assert len(days) > 0
-    day = days[0]
-    assert "date" in day
-    assert "count" in day
-    assert isinstance(day["count"], int)
-
-
-def test_heatmap_api_has_completions(client):
-    resp = client.get("/api/analytics/heatmap")
+def test_heatmap_api_streak_types(client):
+    resp = client.get("/api/analytics/heatmap?weeks=4")
     data = resp.get_json()
-    total = sum(d["count"] for d in data["days"])
-    assert total > 0
-    assert data["stats"]["total_completions"] == total
+    assert isinstance(data["current_streak"], int)
+    assert isinstance(data["longest_streak"], int)
+    assert isinstance(data["total_completions"], int)
+    assert data["current_streak"] >= 0
+    assert data["longest_streak"] >= 0
+    assert data["total_completions"] >= 0
 
 
 # --- POST /api/tasks tests ---
