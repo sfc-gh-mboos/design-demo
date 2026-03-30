@@ -1,11 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
   const filters = document.getElementById("filters");
   const viewToggle = document.getElementById("viewToggle");
-  const searchInput = document.getElementById("searchInput");
   const taskList = document.getElementById("taskList");
   const listView = document.getElementById("listView");
   const boardView = document.getElementById("boardView");
-  const taskCount = document.getElementById("taskCount");
   const dateLabel = document.getElementById("dateLabel");
 
   dateLabel.textContent = new Date().toLocaleDateString("en-US", {
@@ -58,6 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(`Failed to delete task: ${res.statusText}`);
       }
     },
+
   };
 
   // --- State ---
@@ -66,7 +65,6 @@ document.addEventListener("DOMContentLoaded", () => {
     tasks: [],
     filter: "all",
     view: "list",
-    searchQuery: "",
   };
 
   async function loadTasks() {
@@ -109,8 +107,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function render() {
     const visibleTasks = getVisibleTasks();
     const count = visibleTasks.length;
-    taskCount.textContent = `${count} task${count !== 1 ? "s" : ""}`;
-
     if (state.view === "board") {
       listView.classList.add("hidden");
       boardView.classList.remove("hidden");
@@ -150,13 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getVisibleTasks() {
-    const query = state.searchQuery.trim().toLowerCase();
-    if (!query) return state.tasks;
-    return state.tasks.filter((task) => {
-      const title = String(task.title || "").toLowerCase();
-      const category = String(task.category || "").toLowerCase();
-      return title.includes(query) || category.includes(query);
-    });
+    return state.tasks;
   }
 
   let columnDropZonesSetup = false;
@@ -364,11 +354,6 @@ document.addEventListener("DOMContentLoaded", () => {
   viewToggle.addEventListener("click", (e) => {
     if (!e.target.matches(".view-toggle-btn")) return;
     setView(e.target.dataset.view);
-  });
-
-  searchInput.addEventListener("input", (e) => {
-    state.searchQuery = e.target.value || "";
-    render();
   });
 
   // --- Add Task Modal ---
