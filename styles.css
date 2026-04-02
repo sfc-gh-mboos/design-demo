@@ -21,6 +21,23 @@
   --divider: #e6e5e0;
   --radius: 12px;
   --radius-sm: 8px;
+  --topbar-bg: rgba(242, 241, 237, 0.85);
+}
+
+[data-theme="dark"] {
+  --bg: #1a1a1a;
+  --fg: #e4e4e0;
+  --fg-secondary: rgba(228, 228, 224, 0.55);
+  --accent: #ff6b2b;
+  --accent-subtle: rgba(255, 107, 43, 0.14);
+  --accent-hover: #ff7d42;
+  --accent-orange: #ff6b2b;
+  --card: #242424;
+  --card-border: rgba(255, 255, 255, 0.07);
+  --card-hover: #2c2c2c;
+  --surface: #2a2a2a;
+  --divider: #333;
+  --topbar-bg: rgba(26, 26, 26, 0.88);
 }
 
 html {
@@ -34,6 +51,7 @@ body {
   color: var(--fg);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* ---- Top bar ---- */
@@ -42,7 +60,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(242, 241, 237, 0.85);
+  background: var(--topbar-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--card-border);
@@ -102,6 +120,46 @@ body {
 
 .nav-link.active {
   color: var(--accent);
+}
+
+/* ---- Dark mode toggle ---- */
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  flex-shrink: 0;
+  color: var(--fg);
+}
+
+.theme-toggle:hover {
+  background: var(--card-hover);
+  border-color: var(--accent);
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s ease, opacity 0.2s ease;
+}
+
+.theme-toggle .icon-sun {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle .icon-moon {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle .icon-sun {
+  display: block;
 }
 
 /* ---- Container ---- */
@@ -280,7 +338,7 @@ body {
 }
 
 .status-todo {
-  border: 2px solid rgba(38, 37, 30, 0.25);
+  border: 2px solid var(--fg-secondary);
   background: transparent;
 }
 
@@ -314,7 +372,7 @@ body {
 .task-card[data-status="done"] .task-title {
   color: var(--fg-secondary);
   text-decoration: line-through;
-  text-decoration-color: rgba(38, 37, 30, 0.2);
+  text-decoration-color: var(--fg-secondary);
 }
 
 .task-meta {
@@ -336,7 +394,7 @@ body {
 
 .priority-high {
   color: var(--accent-orange);
-  background: rgba(245, 78, 0, 0.12);
+  background: var(--accent-subtle);
 }
 
 .priority-medium {
@@ -346,7 +404,7 @@ body {
 
 .priority-low {
   color: var(--fg-secondary);
-  background: rgba(38, 37, 30, 0.06);
+  background: var(--accent-subtle);
 }
 
 /* ---- Board ---- */
@@ -456,7 +514,7 @@ body {
 .board-task-title.done {
   color: var(--fg-secondary);
   text-decoration: line-through;
-  text-decoration-color: rgba(38, 37, 30, 0.2);
+  text-decoration-color: var(--fg-secondary);
 }
 
 .board-task-priority {
@@ -472,7 +530,7 @@ body {
 
 .board-task-priority.priority-high {
   color: var(--accent-orange);
-  background: rgba(245, 78, 0, 0.12);
+  background: var(--accent-subtle);
 }
 
 .board-task-priority.priority-medium {
@@ -482,7 +540,7 @@ body {
 
 .board-task-priority.priority-low {
   color: var(--fg-secondary);
-  background: rgba(38, 37, 30, 0.06);
+  background: var(--accent-subtle);
 }
 
 .board-task-meta {
