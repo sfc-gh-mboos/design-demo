@@ -362,6 +362,28 @@ document.addEventListener("DOMContentLoaded", () => {
     render();
   });
 
+  // --- Dark mode toggle ---
+
+  const themeToggle = document.getElementById("themeToggle");
+
+  function applyTheme(theme) {
+    if (theme === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+  }
+
+  function getCurrentTheme() {
+    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  }
+
+  themeToggle.addEventListener("click", () => {
+    const next = getCurrentTheme() === "dark" ? "light" : "dark";
+    applyTheme(next);
+    localStorage.setItem("theme", next);
+  });
+
   // --- Init ---
 
   loadTasks();
