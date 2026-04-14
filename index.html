@@ -23,9 +23,39 @@
   </header>
 
   <main class="container">
-    <section class="hero">
-      <h1>Daily Tasks</h1>
-      <p class="subtitle">Stay on track. One task at a time. <span id="dateLabel"></span></p>
+    <section class="hero hero--home" aria-labelledby="heroTitle">
+      <div class="hero-card">
+        <div class="hero-main">
+          <p class="hero-eyebrow" id="heroGreeting"></p>
+          <h1 id="heroTitle">Daily Tasks</h1>
+          <p class="subtitle hero-subtitle">Stay on track. One task at a time. <span class="hero-date" id="dateLabel"></span></p>
+          <div class="hero-stats" role="list">
+            <div class="hero-stat" role="listitem">
+              <span class="hero-stat-value" id="heroStatTodo">0</span>
+              <span class="hero-stat-label">To do</span>
+            </div>
+            <div class="hero-stat" role="listitem">
+              <span class="hero-stat-value" id="heroStatProgress">0</span>
+              <span class="hero-stat-label">In progress</span>
+            </div>
+            <div class="hero-stat hero-stat--accent" role="listitem">
+              <span class="hero-stat-value" id="heroStatDone">0</span>
+              <span class="hero-stat-label">Done</span>
+            </div>
+          </div>
+        </div>
+        <div class="hero-ring-wrap" aria-hidden="true">
+          <svg class="hero-ring" viewBox="0 0 120 120">
+            <circle class="hero-ring-track" cx="60" cy="60" r="52" fill="none" stroke-width="10" />
+            <circle class="hero-ring-fill" id="heroRingArc" cx="60" cy="60" r="52" fill="none" stroke-width="10"
+              stroke-linecap="round" transform="rotate(-90 60 60)" />
+          </svg>
+          <div class="hero-ring-center">
+            <span class="hero-ring-pct"><span id="heroPct">0</span>%</span>
+            <span class="hero-ring-caption">complete</span>
+          </div>
+        </div>
+      </div>
     </section>
 
     <div class="toolbar">

@@ -409,6 +409,116 @@ def _get_analytics_date_params():
     return start_date, end_date
 
 
+def _heatmap_summary(conn, today):
+    total_completions = conn.execute(
+        """
+        SELECT COUNT(*) AS total
+        FROM tasks
+        WHERE status = 'done' AND completed_at IS NOT NULL AND completed_at != ''
+        """
+    ).fetchone()["total"]
+    completion_rows = conn.execute(
+        """
+        SELECT date(completed_at) AS completion_day
+        FROM tasks
+        WHERE status = 'done' AND completed_at IS NOT NULL AND completed_at != ''
+        GROUP BY date(completed_at)
+        ORDER BY completion_day ASC
+        """
+    ).fetchall()
+    completion_days = [datetime.strptime(row["completion_day"], "%Y-%m-%d").date() for row in completion_rows]
+    completion_day_set = set(completion_days)
+
+    current_streak = 0
+    probe_day = today
+    while probe_day in completion_day_set:
+        current_streak += 1
+        probe_day -= timedelta(days=1)
+
+    longest_streak = 0
+    running_streak = 0
+    previous_day = None
+    for day in completion_days:
+        if previous_day is None:
+            running_streak = 1
+        elif (day - previous_day).days == 1:
+            running_streak += 1
+        else:
+            running_streak = 1
+        longest_streak = max(longest_streak, running_streak)
+        previous_day = day
+
+    return {
+        "current_streak_days": current_streak,
+        "longest_streak_days": longest_streak,
+        "total_completions": total_completions,
+    }
+
+
+def _build_heatmap_grid(conn, today):
+    current_week_monday = today - timedelta(days=today.weekday())
+    grid_start = current_week_monday - timedelta(weeks=11)
+    grid_end = current_week_monday + timedelta(days=6)
+    daily_counts_rows = conn.execute(
+        """
+        SELECT date(completed_at) AS completion_day, COUNT(*) AS completion_count
+        FROM tasks
+        WHERE status = 'done'
+          AND completed_at IS NOT NULL
+          AND completed_at != ''
+          AND date(completed_at) BETWEEN ? AND ?
+        GROUP BY date(completed_at)
+        """,
+        (grid_start.isoformat(), grid_end.isoformat()),
+    ).fetchall()
+    daily_counts = {row["completion_day"]: row["completion_count"] for row in daily_counts_rows}
+    max_count = max(daily_counts.values(), default=0)
+
+    def level_for_count(count):
+        if count <= 0:
+            return 0
+        if max_count <= 1:
+            return 5
+        ratio = count / max_count
+        if ratio <= 0.2:
+            return 1
+        if ratio <= 0.4:
+            return 2
+        if ratio <= 0.6:
+            return 3
+        if ratio <= 0.8:
+            return 4
+        return 5
+
+    weeks = []
+    month_labels = []
+    for week_index in range(12):
+        week_start = grid_start + timedelta(weeks=week_index)
+        if week_index == 0 or week_start.month != (week_start - timedelta(weeks=1)).month:
+            month_labels.append({"month": week_start.strftime("%b"), "column": week_index})
+        days = []
+        for day_index in range(7):
+            day = week_start + timedelta(days=day_index)
+            day_key = day.isoformat()
+            count = daily_counts.get(day_key, 0)
+            days.append(
+                {
+                    "date": day_key,
+                    "count": count,
+                    "level": level_for_count(count),
+                }
+            )
+        weeks.append({"week_start": week_start.isoformat(), "days": days})
+
+    return {
+        "range_start": grid_start.isoformat(),
+        "range_end": grid_end.isoformat(),
+        "month_labels": month_labels,
+        "weeks": weeks,
+        "max_daily_count": max_count,
+    }
+
+
 @app.route("/api/analytics/summary", methods=["GET"])
 def analytics_summary():
     cohort = request.args.get("cohort", "all")
@@ -445,63 +555,31 @@ def analytics_trends():
     return jsonify(data["trends"])
 
 
+@app.route("/api/analytics/heatmap", methods=["GET"])
+def analytics_heatmap():
+    conn = get_db()
+    today = datetime.now(timezone.utc).date()
+    heatmap = _build_heatmap_grid(conn, today)
+    summary = _heatmap_summary(conn, today)
+    conn.close()
+    return jsonify(
+        {
+            "summary": summary,
+            "range": {
+                "start": heatmap["range_start"],
+                "end": heatmap["range_end"],
+            },
+            "month_labels": heatmap["month_labels"],
+            "weeks": heatmap["weeks"],
+            "legend_levels": [0, 1, 2, 3, 4, 5],
+            "day_labels": ["Mon", "Wed", "Fri", "Sun"],
+        }
+    )
+
+
 @app.route("/analytics")
 def analytics_page():
     return send_from_directory(".", "analytics.html")
-
-
-@app.route("/api/analytics/heatmap", methods=["GET"])
-def analytics_heatmap():
-    weeks = request.args.get("weeks", 12, type=int)
-    weeks = max(1, min(weeks, 52))
-
-    today = datetime.now(timezone.utc).date()
-    weekday = today.weekday()  # 0=Mon
-    end_date = today
-    start_date = today - timedelta(days=weekday + (weeks - 1) * 7)
-
-    conn = get_db()
-    rows = conn.execute(
-        """SELECT DATE(completed_at) as day, COUNT(*) as count
-           FROM tasks
-           WHERE completed_at IS NOT NULL
-             AND DATE(completed_at) >= ?
-             AND DATE(completed_at) <= ?
-           GROUP BY DATE(completed_at)
-           ORDER BY day""",
-        (start_date.isoformat(), end_date.isoformat()),
-    ).fetchall()
-    conn.close()
-
-    daily_counts = {r["day"]: r["count"] for r in rows}
-
-    total_completions = sum(daily_counts.values())
-
-    current_streak = 0
-    d = today
-    while daily_counts.get(d.isoformat(), 0) > 0:
-        current_streak += 1
-        d -= timedelta(days=1)
-
-    longest_streak = 0
-    streak = 0
-    d = start_date
-    while d <= end_date:
-        if daily_counts.get(d.isoformat(), 0) > 0:
-            streak += 1
-            longest_streak = max(longest_streak, streak)
-        else:
-            streak = 0
-        d += timedelta(days=1)
-
-    return jsonify({
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "daily_counts": daily_counts,
-        "current_streak": current_streak,
-        "longest_streak": longest_streak,
-        "total_completions": total_completions,
-    })
 
 
 @app.route("/heatmap")
