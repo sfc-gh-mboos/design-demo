@@ -171,14 +171,6 @@ document.addEventListener("DOMContentLoaded", () => {
     card.addEventListener("dragleave", () => {
       card.classList.remove("drag-over-card");
     });
-    card.addEventListener("drop", async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      card.classList.remove("drag-over-card");
-      const beforeTaskId = Number(card.dataset.taskId);
-      const targetDate = card.dataset.plannedDate || null;
-      await handleDrop(targetDate, beforeTaskId);
-    });
     return card;
   }
 
@@ -189,14 +181,20 @@ document.addEventListener("DOMContentLoaded", () => {
     lane.addEventListener("dragover", (event) => {
       event.preventDefault();
       lane.classList.add("drag-over");
-    });
+    }, true);
     lane.addEventListener("dragleave", () => {
       lane.classList.remove("drag-over");
     });
     lane.addEventListener("drop", async (event) => {
       event.preventDefault();
+      event.stopPropagation();
       lane.classList.remove("drag-over");
-      await handleDrop(dateString || null, null);
+      const dropTarget = event.target;
+      const targetCard = dropTarget.classList?.contains("planner-task-card")
+        ? dropTarget
+        : dropTarget.closest?.(".planner-task-card");
+      const beforeTaskId = targetCard ? Number(targetCard.dataset.taskId) : null;
+      await handleDrop(dateString || null, Number.isFinite(beforeTaskId) ? beforeTaskId : null, event);
     });
     return lane;
   }
@@ -252,6 +250,21 @@ document.addEventListener("DOMContentLoaded", () => {
     article.appendChild(header);
     article.appendChild(meter);
     article.appendChild(lane);
+    article.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      lane.classList.add("drag-over");
+    }, true);
+    article.addEventListener("dragleave", (event) => {
+      if (!article.contains(event.relatedTarget)) {
+        lane.classList.remove("drag-over");
+      }
+    });
+    article.addEventListener("drop", async (event) => {
+      if (event.target.closest(".planner-drop-lane")) return;
+      event.preventDefault();
+      lane.classList.remove("drag-over");
+      await handleDrop(dateString, null, event);
+    });
     return article;
   }
 
@@ -271,15 +284,50 @@ document.addEventListener("DOMContentLoaded", () => {
     backlogLane.addEventListener("dragover", (event) => {
       event.preventDefault();
       backlogLane.classList.add("drag-over");
-    });
+    }, true);
     backlogLane.addEventListener("dragleave", () => {
       backlogLane.classList.remove("drag-over");
     });
     backlogLane.addEventListener("drop", async (event) => {
       event.preventDefault();
+      event.stopPropagation();
       backlogLane.classList.remove("drag-over");
-      await handleDrop(null, null);
+      const targetCard = event.target.closest(".planner-task-card");
+      const beforeTaskId = targetCard ? Number(targetCard.dataset.taskId) : null;
+      await handleDrop(null, Number.isFinite(beforeTaskId) ? beforeTaskId : null, event);
     });
+    const backlogColumn = backlogLane.closest(".planner-backlog-column");
+    if (backlogColumn) {
+      backlogColumn.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        backlogLane.classList.add("drag-over");
+      }, true);
+      backlogColumn.addEventListener("dragleave", (event) => {
+        if (!backlogColumn.contains(event.relatedTarget)) {
+          backlogLane.classList.remove("drag-over");
+        }
+      });
+      backlogColumn.addEventListener("drop", async (event) => {
+        if (event.target.closest("#backlogLane")) return;
+        event.preventDefault();
+        backlogLane.classList.remove("drag-over");
+        await handleDrop(null, null, event);
+      });
+    }
+  }
+
+  function getDragContext(dropEvent = null) {
+    const fromStateTaskId = Number.isInteger(state.dragTaskId) ? state.dragTaskId : null;
+    const fromTransferRaw = dropEvent?.dataTransfer?.getData("text/task-id");
+    const fromTransferTaskId = fromTransferRaw ? Number(fromTransferRaw) : null;
+    const taskId =
+      fromStateTaskId ??
+      (Number.isFinite(fromTransferTaskId) ? fromTransferTaskId : null);
+    const sourceDateFromTransfer = dropEvent?.dataTransfer?.getData("text/source-date");
+    const sourceDate =
+      state.dragSourceDate ??
+      (sourceDateFromTransfer ? sourceDateFromTransfer : null);
+    return { taskId, sourceDate };
   }
 
   function handleDragStart(event) {
@@ -289,6 +337,9 @@ document.addEventListener("DOMContentLoaded", () => {
     state.dragSourceDate = task?.planned_date || null;
     event.currentTarget.classList.add("dragging");
     event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(taskId));
+    event.dataTransfer.setData("text/task-id", String(taskId));
+    event.dataTransfer.setData("text/source-date", state.dragSourceDate || "");
   }
 
   function handleDragEnd(event) {
@@ -315,11 +366,12 @@ document.addEventListener("DOMContentLoaded", () => {
     await Promise.all(updates);
   }
 
-  async function handleDrop(targetDate, beforeTaskId = null) {
-    if (!state.dragTaskId) return;
-    const task = state.tasks.find((item) => item.id === state.dragTaskId);
+  async function handleDrop(targetDate, beforeTaskId = null, dropEvent = null) {
+    const { taskId, sourceDate: dragSourceDate } = getDragContext(dropEvent);
+    if (!taskId) return;
+    const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return;
-    const sourceDate = task.planned_date || null;
+    const sourceDate = task.planned_date || dragSourceDate || null;
     if (sourceDate === targetDate && beforeTaskId === task.id) return;
 
     try {
