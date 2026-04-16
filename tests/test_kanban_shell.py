@@ -34,3 +34,13 @@ def test_index_includes_board_shell_columns(ui_client):
     assert 'data-board-column="todo"' in html
     assert 'data-board-column="in-progress"' in html
     assert 'data-board-column="done"' in html
+
+
+def test_planner_route_renders_shell(ui_client):
+    response = ui_client.get("/planner")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Weekly Planner" in html
+    assert 'id="plannerWeekGrid"' in html
+    assert 'id="backlogLane"' in html

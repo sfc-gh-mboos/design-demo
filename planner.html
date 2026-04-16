@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Taskflow · Weekly Planner</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="planner-page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/planner" class="nav-link active">Weekly Planner</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container planner-container">
+    <section class="hero planner-hero">
+      <h1>Weekly Planner</h1>
+      <p class="subtitle planner-subtitle">Drag tasks from backlog into Monday–Sunday slots.</p>
+    </section>
+
+    <section class="planner-toolbar" aria-label="Planner controls">
+      <div class="planner-week-controls">
+        <button type="button" class="planner-btn planner-btn-secondary" id="prevWeekBtn">Prev week</button>
+        <button type="button" class="planner-btn planner-btn-secondary" id="currentWeekBtn">Current week</button>
+        <button type="button" class="planner-btn planner-btn-secondary" id="nextWeekBtn">Next week</button>
+        <span class="planner-week-label" id="weekLabel"></span>
+      </div>
+
+      <div class="planner-quick-actions">
+        <label class="planner-capacity-label" for="capacityInput">Capacity/day</label>
+        <input
+          id="capacityInput"
+          class="planner-capacity-input"
+          type="number"
+          min="1"
+          value="4"
+          aria-label="Daily task capacity"
+        >
+        <button type="button" class="planner-btn planner-btn-primary" id="autoPlanBtn">Auto-plan high priority</button>
+        <button type="button" class="planner-btn planner-btn-danger" id="resetWeekBtn">Reset week</button>
+      </div>
+    </section>
+
+    <section class="planner-board" aria-label="Weekly planning board">
+      <article class="planner-column planner-backlog-column">
+        <header class="planner-column-header">
+          <h2 class="planner-column-title">Backlog</h2>
+          <span class="planner-column-count" id="backlogCount">0</span>
+        </header>
+        <div class="planner-dropzone" data-planner-lane="backlog" id="backlogLane"></div>
+      </article>
+
+      <div class="planner-week-grid" id="plannerWeekGrid"></div>
+    </section>
+  </main>
+
+  <script src="planner.js"></script>
+</body>
+</html>
