@@ -42,7 +42,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let priorityFocusChart = null;
   let productivityScoreChart = null;
   let dailyVolumeChart = null;
-  
   // Color palette using Cursor brand colors
   const colors = {
     accent: "#f54e00",
