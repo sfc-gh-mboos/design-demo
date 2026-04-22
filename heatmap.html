@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity — Taskflow</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/heatmap" class="nav-link active">Activity</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="analytics-container">
+    <section class="hero">
+      <h1>Activity</h1>
+      <p class="subtitle">Task completions per day over the last 12 weeks</p>
+    </section>
+
+    <div class="heatmap-stats" id="heatmapStats" aria-live="polite">
+      <div class="heatmap-stat">
+        <div class="heatmap-stat-value" id="statCurrentStreak">—</div>
+        <div class="heatmap-stat-label">Current streak (days)</div>
+      </div>
+      <div class="heatmap-stat">
+        <div class="heatmap-stat-value" id="statLongestStreak">—</div>
+        <div class="heatmap-stat-label">Longest streak (days)</div>
+      </div>
+      <div class="heatmap-stat">
+        <div class="heatmap-stat-value" id="statTotal">—</div>
+        <div class="heatmap-stat-label">Total completions</div>
+      </div>
+    </div>
+
+    <div class="heatmap-legend" aria-hidden="true">
+      <span class="heatmap-legend-text">Less</span>
+      <div class="heatmap-legend-cells">
+        <span class="heatmap-cell heatmap-cell--level-0" title="0"></span>
+        <span class="heatmap-cell heatmap-cell--level-1" title="1"></span>
+        <span class="heatmap-cell heatmap-cell--level-2" title="2"></span>
+        <span class="heatmap-cell heatmap-cell--level-3" title="3"></span>
+        <span class="heatmap-cell heatmap-cell--level-4" title="4"></span>
+        <span class="heatmap-cell heatmap-cell--level-5" title="5+"></span>
+      </div>
+      <span class="heatmap-legend-text">More</span>
+    </div>
+
+    <p class="heatmap-error" id="heatmapError" role="alert" hidden></p>
+
+    <div class="heatmap-scroll">
+      <div class="heatmap-board" id="heatmapBoard" aria-label="Task completion heatmap, last 12 weeks"></div>
+    </div>
+  </main>
+
+  <script src="heatmap.js"></script>
+</body>
+</html>

@@ -571,8 +571,9 @@ def analytics_heatmap():
             },
             "month_labels": heatmap["month_labels"],
             "weeks": heatmap["weeks"],
+            "max_daily_count": heatmap["max_daily_count"],
             "legend_levels": [0, 1, 2, 3, 4, 5],
-            "day_labels": ["Mon", "Wed", "Fri", "Sun"],
+            "day_labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         }
     )
 
