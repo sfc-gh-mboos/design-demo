@@ -23,9 +23,11 @@
 
   <main class="container">
     <section class="hero hero--tasks" aria-labelledby="heroTitle">
+      <p class="hero-eyebrow hero-eyebrow--tasks">Today</p>
       <h1 id="heroTitle">Daily Tasks</h1>
     </section>
 
+    <div class="quick-add-shell">
     <form id="quickAddForm" class="quick-add" autocomplete="off" aria-label="Quick add task">
       <label class="sr-only" for="quickAddInput">What needs to be done?</label>
       <input
@@ -42,6 +44,7 @@
       <span class="quick-add-hint">Uses your last category and priority, or defaults.</span>
       <button type="button" class="quick-add-link" id="openDetailsAdd">More options…</button>
     </p>
+    </div>
 
     <div class="toolbar">
       <div class="toolbar-left">

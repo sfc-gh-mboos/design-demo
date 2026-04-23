@@ -21,6 +21,9 @@
   --divider: #e6e5e0;
   --radius: 12px;
   --radius-sm: 8px;
+  --shadow-sm: 0 1px 2px rgba(38, 37, 30, 0.04);
+  --shadow-md: 0 8px 24px -12px rgba(38, 37, 30, 0.12);
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 html {
@@ -28,9 +31,15 @@ html {
 }
 
 body {
-  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   background: var(--bg);
+  background-image: radial-gradient(
+    ellipse 120% 80% at 50% -20%,
+    rgba(245, 78, 0, 0.06) 0%,
+    transparent 55%
+  );
+  background-attachment: fixed;
   color: var(--fg);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -49,7 +58,7 @@ body {
 }
 
 .topbar-inner {
-  max-width: 900px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 14px 24px;
   display: flex;
@@ -107,7 +116,7 @@ body {
 /* ---- Container ---- */
 
 .container {
-  max-width: 680px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 0 24px 80px;
 }
@@ -119,7 +128,17 @@ body {
 }
 
 .hero--tasks {
-  padding: 28px 0 16px;
+  padding: 28px 0 20px;
+}
+
+.hero-eyebrow--tasks {
+  justify-content: center;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--fg-secondary);
 }
 
 .sr-only {
@@ -136,24 +155,38 @@ body {
 
 /* ---- Quick add (minimal path) ---- */
 
+.quick-add-shell {
+  margin-bottom: 4px;
+  padding: 16px 18px 14px;
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    var(--card) 48%,
+    var(--card) 100%
+  );
+  border: 1px solid var(--card-border);
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow: var(--shadow-sm), var(--shadow-md);
+}
+
 .quick-add {
   display: flex;
   align-items: stretch;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 8px;
 }
 
 .quick-add-input {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--divider);
-  background: var(--card);
+  border: 1px solid rgba(38, 37, 30, 0.08);
+  background: var(--bg);
   border-radius: var(--radius);
-  padding: 12px 14px;
+  padding: 13px 16px;
   font-size: 0.95rem;
   color: var(--fg);
   font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
 }
 
 .quick-add-input::placeholder {
@@ -171,13 +204,17 @@ body {
   border: none;
   background: var(--accent);
   color: #fff;
-  padding: 0 18px;
+  padding: 0 20px;
   font-size: 0.85rem;
   font-weight: 600;
   border-radius: var(--radius);
   cursor: pointer;
   font-family: inherit;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out), transform 0.15s ease;
+}
+
+.quick-add-submit:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .quick-add-submit:hover:not(:disabled) {
@@ -195,9 +232,14 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 12px;
-  margin-bottom: 20px;
+  margin-bottom: 0;
+  padding-top: 2px;
   font-size: 0.78rem;
   color: var(--fg-secondary);
+}
+
+.quick-add-shell + .toolbar {
+  margin-top: 22px;
 }
 
 .quick-add-hint {
@@ -591,14 +633,19 @@ body {
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
-  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out),
+    transform 0.2s var(--ease-out);
   cursor: pointer;
 }
 
 .task-card:hover {
   background: var(--card-hover);
   border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm), 0 4px 16px rgba(38, 37, 30, 0.06);
+  transform: translateY(-1px);
 }
 
 .task-card.hidden {
@@ -1188,10 +1235,16 @@ body {
   flex-direction: column;
   gap: 16px;
   margin-bottom: 24px;
-  padding: 16px;
-  background: var(--card);
+  padding: 18px 20px;
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.45) 0%,
+    var(--card) 55%,
+    var(--card) 100%
+  );
   border: 1px solid var(--card-border);
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) + 2px);
+  box-shadow: var(--shadow-sm), var(--shadow-md);
 }
 
 .filter-row {
@@ -1356,6 +1409,179 @@ body {
 .chart-card canvas {
   flex: 1;
   max-height: 280px;
+}
+
+.chart-card canvas.hidden {
+  display: none;
+}
+
+.chart-fallback-notice {
+  max-width: 960px;
+  margin: -8px auto 20px;
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  color: var(--fg-secondary);
+  background: var(--accent-subtle);
+  border: 1px solid rgba(245, 78, 0, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+.chart-fallback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 200px;
+  justify-content: center;
+}
+
+.chart-fallback-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 22%) 1fr minmax(52px, auto);
+  align-items: center;
+  gap: 10px;
+}
+
+.chart-fallback-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chart-fallback-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(38, 37, 30, 0.08);
+  overflow: hidden;
+}
+
+.chart-fallback-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  min-width: 2px;
+  transition: width 0.35s var(--ease-out);
+}
+
+.chart-fallback-fill--high {
+  background: rgba(245, 78, 0, 0.9);
+}
+
+.chart-fallback-fill--medium {
+  background: rgba(245, 78, 0, 0.55);
+}
+
+.chart-fallback-fill--low {
+  background: rgba(38, 37, 30, 0.35);
+}
+
+.chart-fallback-value {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-secondary);
+  text-align: right;
+}
+
+.chart-fallback--spark {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 3px;
+  min-height: 220px;
+  padding: 8px 4px 0;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    180deg,
+    rgba(38, 37, 30, 0.03) 0%,
+    transparent 40%
+  );
+}
+
+.chart-fallback-spark-col {
+  flex: 1;
+  min-width: 0;
+  height: 200px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+}
+
+.chart-fallback-spark-bar {
+  flex: 1;
+  max-width: 5px;
+  min-height: 6px;
+  border-radius: 3px 3px 1px 1px;
+  align-self: flex-end;
+  transition: height 0.35s var(--ease-out);
+}
+
+.chart-fallback-spark-bar--accent {
+  background: var(--accent);
+}
+
+.chart-fallback-spark-bar--muted {
+  background: rgba(38, 37, 30, 0.35);
+}
+
+.chart-fallback-spark-bar--high {
+  background: rgba(245, 78, 0, 0.9);
+}
+
+.chart-fallback-spark-bar--medium {
+  background: rgba(245, 78, 0, 0.55);
+}
+
+.chart-fallback-spark-bar--low {
+  background: rgba(38, 37, 30, 0.32);
+}
+
+.chart-fallback-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--divider);
+}
+
+.chart-fallback-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--fg-secondary);
+}
+
+.chart-fallback-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chart-fallback-dot--accent {
+  background: var(--accent);
+}
+
+.chart-fallback-dot--muted {
+  background: rgba(38, 37, 30, 0.35);
+}
+
+.chart-fallback-dot--high {
+  background: rgba(245, 78, 0, 0.9);
+}
+
+.chart-fallback-dot--medium {
+  background: rgba(245, 78, 0, 0.55);
+}
+
+.chart-fallback-dot--low {
+  background: rgba(38, 37, 30, 0.32);
 }
 
 /* ---- Analytics Responsive ---- */

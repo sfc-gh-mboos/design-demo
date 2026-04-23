@@ -1,4 +1,28 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  function loadChartLib() {
+    if (typeof Chart !== "undefined") {
+      return Promise.resolve(true);
+    }
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src =
+        "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js";
+      const finish = (ok) => {
+        clearTimeout(timeout);
+        resolve(ok);
+      };
+      const timeout = setTimeout(() => {
+        script.remove();
+        finish(false);
+      }, 2800);
+      script.onload = () => finish(typeof Chart !== "undefined");
+      script.onerror = () => finish(false);
+      document.head.appendChild(script);
+    });
+  }
+
+  const chartsAvailable = await loadChartLib();
+
   const cohortFilter = document.getElementById("cohortFilter");
   const startDateInput = document.getElementById("startDate");
   const endDateInput = document.getElementById("endDate");
@@ -103,6 +127,217 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("kpiHighPriority").textContent = `${summary.high_priority_completion}%`;
   }
   
+  function chartCardForCanvas(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    return canvas ? canvas.closest(".chart-card") : null;
+  }
+
+  function clearChartFallback(canvasId) {
+    const card = chartCardForCanvas(canvasId);
+    if (!card) return;
+    card
+      .querySelectorAll(".chart-fallback, .chart-fallback-legend")
+      .forEach((el) => el.remove());
+    const canvas = document.getElementById(canvasId);
+    if (canvas) canvas.classList.remove("hidden");
+  }
+
+  function showFallbackNotice() {
+    if (document.getElementById("chartFallbackNotice")) return;
+    const bar = document.createElement("p");
+    bar.id = "chartFallbackNotice";
+    bar.className = "chart-fallback-notice";
+    bar.textContent =
+      "Charts library did not load; showing a compact data preview instead.";
+    const hero = document.querySelector(".analytics-container .hero");
+    if (hero) hero.after(bar);
+  }
+
+  function renderFallbackCategory(data) {
+    const id = "categoryChart";
+    clearChartFallback(id);
+    const canvas = document.getElementById(id);
+    const card = chartCardForCanvas(id);
+    if (!canvas || !card) return;
+    canvas.classList.add("hidden");
+    const wrap = document.createElement("div");
+    wrap.className = "chart-fallback";
+    const max = Math.max(
+      1,
+      ...data.by_category.map((c) => c.completed || 0)
+    );
+    data.by_category.forEach((c, i) => {
+      const row = document.createElement("div");
+      row.className = "chart-fallback-row";
+      const label = document.createElement("span");
+      label.className = "chart-fallback-label";
+      label.textContent = c.name;
+      const track = document.createElement("div");
+      track.className = "chart-fallback-track";
+      const fill = document.createElement("span");
+      fill.className = "chart-fallback-fill";
+      fill.style.width = `${Math.round((c.completed / max) * 100)}%`;
+      fill.style.opacity = String(0.45 + (0.15 * (3 - Math.min(i, 3))));
+      const val = document.createElement("span");
+      val.className = "chart-fallback-value";
+      val.textContent = `${c.completed}/${c.total}`;
+      track.appendChild(fill);
+      row.append(label, track, val);
+      wrap.appendChild(row);
+    });
+    card.appendChild(wrap);
+  }
+
+  function renderFallbackPriority(data) {
+    const id = "priorityChart";
+    clearChartFallback(id);
+    const canvas = document.getElementById(id);
+    const card = chartCardForCanvas(id);
+    if (!canvas || !card) return;
+    canvas.classList.add("hidden");
+    const wrap = document.createElement("div");
+    wrap.className = "chart-fallback";
+    const max = Math.max(1, ...data.by_priority.map((p) => p.count || 0));
+    data.by_priority.forEach((p) => {
+      const row = document.createElement("div");
+      row.className = "chart-fallback-row";
+      const label = document.createElement("span");
+      label.className = "chart-fallback-label";
+      label.textContent =
+        p.name.charAt(0).toUpperCase() + p.name.slice(1);
+      const track = document.createElement("div");
+      track.className = "chart-fallback-track";
+      const fill = document.createElement("span");
+      fill.className = `chart-fallback-fill chart-fallback-fill--${p.name}`;
+      fill.style.width = `${Math.round((p.count / max) * 100)}%`;
+      const val = document.createElement("span");
+      val.className = "chart-fallback-value";
+      val.textContent = String(p.count);
+      track.appendChild(fill);
+      row.append(label, track, val);
+      wrap.appendChild(row);
+    });
+    card.appendChild(wrap);
+  }
+
+  function renderFallbackSeries(canvasId, labels, series) {
+    clearChartFallback(canvasId);
+    const canvas = document.getElementById(canvasId);
+    const card = chartCardForCanvas(canvasId);
+    if (!canvas || !card) return;
+    canvas.classList.add("hidden");
+    const wrap = document.createElement("div");
+    wrap.className = "chart-fallback chart-fallback--spark";
+    const max = Math.max(
+      1,
+      ...series.flatMap((s) => s.values.map((v) => v || 0))
+    );
+    labels.forEach((_, idx) => {
+      const col = document.createElement("div");
+      col.className = "chart-fallback-spark-col";
+      col.title = `${labels[idx]}: ${series
+        .map((s) => `${s.label} ${s.values[idx] ?? 0}`)
+        .join(", ")}`;
+      series.forEach((s) => {
+        const v = s.values[idx] || 0;
+        const seg = document.createElement("span");
+        seg.className = `chart-fallback-spark-bar chart-fallback-spark-bar--${s.tone}`;
+        const pct = Math.round((v / max) * 100);
+        seg.style.height = `${Math.max(6, pct)}%`;
+        col.appendChild(seg);
+      });
+      wrap.appendChild(col);
+    });
+    const leg = document.createElement("div");
+    leg.className = "chart-fallback-legend";
+    series.forEach((s) => {
+      const item = document.createElement("span");
+      item.className = "chart-fallback-legend-item";
+      const dot = document.createElement("i");
+      dot.className = `chart-fallback-dot chart-fallback-dot--${s.tone}`;
+      item.appendChild(dot);
+      item.appendChild(document.createTextNode(s.label));
+      leg.appendChild(item);
+    });
+    card.appendChild(wrap);
+    card.appendChild(leg);
+  }
+
+  function renderAllFallbacks(distribution, trends) {
+    showFallbackNotice();
+    renderFallbackCategory(distribution);
+    renderFallbackPriority(distribution);
+    const weeks = trends.weekly_progress.map((w) => {
+      const date = new Date(w.week);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    });
+    renderFallbackSeries("weeklyProgressChart", weeks, [
+      {
+        label: "Created",
+        tone: "accent",
+        values: trends.weekly_progress.map((w) => w.created),
+      },
+      {
+        label: "Completed",
+        tone: "muted",
+        values: trends.weekly_progress.map((w) => w.completed),
+      },
+    ]);
+    const pfWeeks = trends.priority_focus.map((w) => {
+      const date = new Date(w.week);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    });
+    renderFallbackSeries("priorityFocusChart", pfWeeks, [
+      {
+        label: "High",
+        tone: "high",
+        values: trends.priority_focus.map((w) => w.high),
+      },
+      {
+        label: "Med",
+        tone: "medium",
+        values: trends.priority_focus.map((w) => w.medium),
+      },
+      {
+        label: "Low",
+        tone: "low",
+        values: trends.priority_focus.map((w) => w.low),
+      },
+    ]);
+    const days = trends.daily_volume.map((d) => {
+      const date = new Date(d.date);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    });
+    renderFallbackSeries("dailyVolumeChart", days, [
+      {
+        label: "Done",
+        tone: "high",
+        values: trends.daily_volume.map((d) => d.done),
+      },
+      {
+        label: "In progress",
+        tone: "medium",
+        values: trends.daily_volume.map((d) => d.in_progress),
+      },
+      {
+        label: "To do",
+        tone: "low",
+        values: trends.daily_volume.map((d) => d.todo),
+      },
+    ]);
+    const scoreWeeks = trends.productivity_score.map((w) => {
+      const date = new Date(w.week);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    });
+    renderFallbackSeries("productivityScoreChart", scoreWeeks, [
+      {
+        label: "Score",
+        tone: "accent",
+        values: trends.productivity_score.map((w) => w.score),
+      },
+    ]);
+  }
+
   // Render category distribution (doughnut chart)
   function renderCategoryChart(data) {
     const ctx = document.getElementById("categoryChart").getContext("2d");
@@ -551,12 +786,25 @@ document.addEventListener("DOMContentLoaded", () => {
       ]);
       
       updateKPIs(summary);
-      renderCategoryChart(distribution);
-      renderPriorityChart(distribution);
-      renderWeeklyProgressChart(trends);
-      renderPriorityFocusChart(trends);
-      renderDailyVolumeChart(trends);
-      renderProductivityScoreChart(trends);
+      if (chartsAvailable) {
+        document.getElementById("chartFallbackNotice")?.remove();
+        [
+          "categoryChart",
+          "priorityChart",
+          "weeklyProgressChart",
+          "priorityFocusChart",
+          "dailyVolumeChart",
+          "productivityScoreChart",
+        ].forEach(clearChartFallback);
+        renderCategoryChart(distribution);
+        renderPriorityChart(distribution);
+        renderWeeklyProgressChart(trends);
+        renderPriorityFocusChart(trends);
+        renderDailyVolumeChart(trends);
+        renderProductivityScoreChart(trends);
+      } else {
+        renderAllFallbacks(distribution, trends);
+      }
     } catch (error) {
       console.error("Failed to load analytics:", error);
       // Show error feedback
