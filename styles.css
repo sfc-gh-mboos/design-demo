@@ -119,7 +119,106 @@ body {
 }
 
 .hero--tasks {
-  padding: 28px 0 24px;
+  padding: 28px 0 16px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- Quick add (minimal path) ---- */
+
+.quick-add {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.quick-add-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--divider);
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  color: var(--fg);
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quick-add-input::placeholder {
+  color: var(--fg-secondary);
+}
+
+.quick-add-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(245, 78, 0, 0.12);
+}
+
+.quick-add-submit {
+  flex-shrink: 0;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  padding: 0 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quick-add-submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 2px 8px rgba(245, 78, 0, 0.25);
+}
+
+.quick-add-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.quick-add-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 20px;
+  font-size: 0.78rem;
+  color: var(--fg-secondary);
+}
+
+.quick-add-hint {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.quick-add-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.quick-add-link:hover {
+  color: var(--accent-hover);
 }
 
 .hero h1 {
@@ -493,7 +592,7 @@ body {
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
   transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-  cursor: default;
+  cursor: pointer;
 }
 
 .task-card:hover {
@@ -508,9 +607,34 @@ body {
 
 /* ---- Status indicator ---- */
 
+.status-hitbox {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: -6px 0 -6px -4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.status-hitbox:hover {
+  background: rgba(38, 37, 30, 0.06);
+}
+
+.status-hitbox:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
 .status-indicator {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -815,6 +939,17 @@ body {
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
 }
 
+.add-task-btn--secondary {
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--divider);
+}
+
+.add-task-btn--secondary:hover {
+  background: var(--card-hover);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
 /* ---- Modal ---- */
 
 .modal-overlay {
@@ -879,6 +1014,59 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.modal-details {
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.modal-details-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--fg-secondary);
+  user-select: none;
+}
+
+.modal-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.modal-details[open] .modal-details-summary {
+  border-bottom: 1px solid var(--divider);
+  color: var(--fg);
+}
+
+.modal-details .form-label {
+  margin-top: 4px;
+}
+
+.modal-details .form-label:first-of-type {
+  margin-top: 0;
+}
+
+.modal-details .form-select {
+  margin-bottom: 0;
+}
+
+.modal-details > .form-label,
+.modal-details > .form-select {
+  margin-left: 12px;
+  margin-right: 12px;
+  width: calc(100% - 24px);
+}
+
+.modal-details > .form-label:first-of-type {
+  padding-top: 12px;
+}
+
+.modal-details > .form-select:last-of-type {
+  margin-bottom: 12px;
 }
 
 .form-label {
