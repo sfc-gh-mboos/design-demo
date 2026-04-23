@@ -42,27 +42,82 @@ document.addEventListener("DOMContentLoaded", () => {
   let priorityFocusChart = null;
   let productivityScoreChart = null;
   let dailyVolumeChart = null;
-  // Color palette using Cursor brand colors
-  const colors = {
-    accent: "#f54e00",
-    accentSubtle: "rgba(245, 78, 0, 0.12)",
-    accentHover: "#ff5c0d",
-    bg: "#f7f7f4",
-    card: "#f2f1ed",
-    fg: "#26251e",
-    fgSecondary: "rgba(38, 37, 30, 0.6)",
-    categoryColors: [
-      "rgba(245, 78, 0, 0.8)",
-      "rgba(245, 78, 0, 0.6)",
-      "rgba(245, 78, 0, 0.4)",
-      "rgba(245, 78, 0, 0.2)"
-    ],
-    priorityColors: {
-      high: "rgba(245, 78, 0, 0.9)",
-      medium: "rgba(245, 78, 0, 0.6)",
-      low: "rgba(38, 37, 30, 0.4)"
+
+  // Resolve chart colors from CSS variables so they follow the active theme.
+  function readVar(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+
+  function rgba(rgbVar, alpha) {
+    const triplet = readVar(rgbVar, "245, 78, 0");
+    return `rgba(${triplet}, ${alpha})`;
+  }
+
+  let colors = themeColors();
+
+  function themeColors() {
+    const theme = document.documentElement.getAttribute("data-theme") || "light";
+    const accent = readVar("--accent", "#f54e00");
+    const accentHover = readVar("--accent-hover", "#ff5c0d");
+    const bg = readVar("--bg", "#f7f7f4");
+    const card = readVar("--card", "#f2f1ed");
+    const fg = readVar("--fg", "#26251e");
+    const fgSecondary = readVar("--fg-secondary", "rgba(38, 37, 30, 0.6)");
+    const accentOrange = readVar("--accent-orange", accent);
+
+    // For the synthwave theme, use a multi-hue neon palette so categories
+    // are visually distinct rather than monochrome variants of the accent.
+    let categoryColors;
+    let priorityColors;
+    let gridColor;
+
+    if (theme === "synthwave") {
+      categoryColors = [
+        "rgba(255, 45, 146, 0.85)",
+        "rgba(0, 240, 255, 0.85)",
+        "rgba(157, 78, 221, 0.85)",
+        "rgba(255, 215, 0, 0.85)"
+      ];
+      priorityColors = {
+        high: "rgba(255, 45, 146, 0.9)",
+        medium: "rgba(0, 240, 255, 0.85)",
+        low: "rgba(157, 78, 221, 0.7)"
+      };
+      gridColor = "rgba(0, 240, 255, 0.18)";
+    } else {
+      categoryColors = [
+        rgba("--accent-rgb", 0.8),
+        rgba("--accent-rgb", 0.6),
+        rgba("--accent-rgb", 0.4),
+        rgba("--accent-rgb", 0.2)
+      ];
+      priorityColors = {
+        high: rgba("--accent-rgb", 0.9),
+        medium: rgba("--accent-rgb", 0.6),
+        low: theme === "dark"
+          ? "rgba(237, 236, 236, 0.35)"
+          : "rgba(38, 37, 30, 0.4)"
+      };
+      gridColor = theme === "dark"
+        ? "rgba(237, 236, 236, 0.08)"
+        : "rgba(38, 37, 30, 0.08)";
     }
-  };
+
+    return {
+      accent,
+      accentSubtle: rgba("--accent-rgb", 0.16),
+      accentHover,
+      accentOrange,
+      bg,
+      card,
+      fg,
+      fgSecondary,
+      categoryColors,
+      priorityColors,
+      gridColor
+    };
+  }
   
   // API layer
   const AnalyticsAPI = {
@@ -195,7 +250,7 @@ document.addEventListener("DOMContentLoaded", () => {
               font: { size: 10 }
             },
             grid: {
-              color: "rgba(38, 37, 30, 0.08)"
+              color: colors.gridColor
             }
           },
           x: {
@@ -276,7 +331,7 @@ document.addEventListener("DOMContentLoaded", () => {
               font: { size: 10 }
             },
             grid: {
-              color: "rgba(38, 37, 30, 0.08)"
+              color: colors.gridColor
             }
           },
           x: {
@@ -370,7 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
               font: { size: 10 }
             },
             grid: {
-              color: "rgba(38, 37, 30, 0.08)"
+              color: colors.gridColor
             }
           }
         }
@@ -433,7 +488,7 @@ document.addEventListener("DOMContentLoaded", () => {
               }
             },
             grid: {
-              color: "rgba(38, 37, 30, 0.08)"
+              color: colors.gridColor
             }
           },
           x: {
@@ -533,7 +588,7 @@ document.addEventListener("DOMContentLoaded", () => {
               stepSize: 1
             },
             grid: {
-              color: "rgba(38, 37, 30, 0.08)"
+              color: colors.gridColor
             }
           }
         }
@@ -597,6 +652,12 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   endDateInput.addEventListener("change", () => {
     setPresetActive("");
+    refreshAnalytics();
+  });
+
+  // Re-render charts with the active theme's palette when the theme changes.
+  document.addEventListener("themechange", () => {
+    colors = themeColors();
     refreshAnalytics();
   });
 });
