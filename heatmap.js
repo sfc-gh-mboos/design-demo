@@ -1,84 +1,98 @@
-function formatDateLabel(iso) {
-  const d = new Date(iso + "T12:00:00");
-  return d.toLocaleDateString(undefined, {
-    weekday: "short",
+function formatDateLabel(isoDate) {
+  const day = new Date(`${isoDate}T12:00:00`);
+  return day.toLocaleDateString(undefined, {
+    weekday: "long",
     month: "short",
     day: "numeric",
     year: "numeric",
   });
 }
 
-function el(tag, className, text) {
-  const n = document.createElement(tag);
-  if (className) n.className = className;
-  if (text != null) n.textContent = text;
-  return n;
+function createElement(tag, className, textContent) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (textContent != null) node.textContent = textContent;
+  return node;
+}
+
+function setSummaryValue(container, value, withUnit) {
+  const numberNode = container.querySelector(".heatmap-summary-number");
+  if (!numberNode) return;
+  numberNode.textContent = String(value);
+  if (!withUnit) return;
+  const unitNode = container.querySelector(".heatmap-summary-unit");
+  if (unitNode) {
+    unitNode.textContent = value === 1 ? "day" : "days";
+  }
 }
 
 function buildBoard(data) {
   const { month_labels: monthLabels, weeks, day_labels: dayLabels } = data;
-  const board = el("div", "heatmap-board-inner");
-  if (!weeks || weeks.length === 0) return board;
+  const root = createElement("div", "heatmap-board-inner");
+  if (!weeks || !weeks.length) return root;
 
-  const byCol = new Map();
-  (monthLabels || []).forEach((m) => byCol.set(m.column, m.month));
+  const monthByColumn = new Map();
+  (monthLabels || []).forEach((item) => monthByColumn.set(item.column, item.month));
 
-  const header = el("div", "heatmap-month-row");
-  header.appendChild(el("div", "heatmap-corner", ""));
-  for (let c = 0; c < weeks.length; c += 1) {
-    const cell = el("div", "heatmap-month-cell", byCol.get(c) || "\u00a0");
-    header.appendChild(cell);
+  const monthRow = createElement("div", "heatmap-month-row");
+  monthRow.appendChild(createElement("div", "heatmap-corner", ""));
+  for (let columnIndex = 0; columnIndex < weeks.length; columnIndex += 1) {
+    monthRow.appendChild(
+      createElement("div", "heatmap-month-cell", monthByColumn.get(columnIndex) || "")
+    );
   }
-  board.appendChild(header);
+  root.appendChild(monthRow);
 
-  for (let r = 0; r < 7; r += 1) {
-    const row = el("div", "heatmap-day-row");
-    const label = el("div", "heatmap-y-label", dayLabels[r] || "");
-    row.appendChild(label);
-    for (let c = 0; c < weeks.length; c += 1) {
-      const day = weeks[c].days[r];
+  const dayLabelRows = new Set([0, 2, 4, 6]);
+  for (let rowIndex = 0; rowIndex < 7; rowIndex += 1) {
+    const row = createElement("div", "heatmap-day-row");
+    const labelText = dayLabelRows.has(rowIndex) ? dayLabels[rowIndex] || "" : "";
+    row.appendChild(createElement("div", "heatmap-y-label", labelText));
+
+    for (let columnIndex = 0; columnIndex < weeks.length; columnIndex += 1) {
+      const day = weeks[columnIndex].days[rowIndex];
       const count = day.count;
       const level = day.level;
-      const cell = el("button", `heatmap-cell heatmap-cell--level-${level}`);
+      const cell = createElement("button", `heatmap-cell heatmap-cell--level-${level}`);
       cell.type = "button";
       cell.dataset.date = day.date;
       cell.dataset.count = String(count);
-      const tip = count === 0
-        ? `${formatDateLabel(day.date)} — no completions`
-        : `${formatDateLabel(day.date)} — ${count} task${count === 1 ? "" : "s"} completed`;
-      cell.title = tip;
-      cell.setAttribute("aria-label", tip);
+      const suffix = count === 1 ? "" : "s";
+      const tooltip = `${formatDateLabel(day.date)}: ${count} completion${suffix}`;
+      cell.title = tooltip;
+      cell.setAttribute("aria-label", tooltip);
       row.appendChild(cell);
     }
-    board.appendChild(row);
+
+    root.appendChild(row);
   }
 
-  return board;
+  return root;
 }
 
-async function init() {
-  const errEl = document.getElementById("heatmapError");
-  const boardEl = document.getElementById("heatmapBoard");
-  const streak = document.getElementById("statCurrentStreak");
-  const longest = document.getElementById("statLongestStreak");
-  const total = document.getElementById("statTotal");
+async function initHeatmap() {
+  const errorNode = document.getElementById("heatmapError");
+  const boardNode = document.getElementById("heatmapBoard");
+  const currentStreakNode = document.getElementById("statCurrentStreak");
+  const longestStreakNode = document.getElementById("statLongestStreak");
+  const totalNode = document.getElementById("statTotal");
 
   try {
-    const res = await fetch("/api/analytics/heatmap");
-    if (!res.ok) throw new Error(res.statusText || "Request failed");
-    const data = await res.json();
+    const response = await fetch("/api/analytics/heatmap");
+    if (!response.ok) throw new Error("Failed to fetch heatmap data");
+    const payload = await response.json();
+    const summary = payload.summary || {};
 
-    const s = data.summary;
-    streak.textContent = s.current_streak_days;
-    longest.textContent = s.longest_streak_days;
-    total.textContent = s.total_completions;
+    setSummaryValue(currentStreakNode, summary.current_streak_days ?? 0, true);
+    setSummaryValue(longestStreakNode, summary.longest_streak_days ?? 0, true);
+    setSummaryValue(totalNode, summary.total_completions ?? 0, false);
 
-    boardEl.replaceChildren(buildBoard(data));
-    errEl.hidden = true;
-  } catch {
-    errEl.textContent = "Could not load activity data. Please try again.";
-    errEl.hidden = false;
+    boardNode.replaceChildren(buildBoard(payload));
+    errorNode.hidden = true;
+  } catch (error) {
+    errorNode.textContent = "Could not load activity data. Please refresh and try again.";
+    errorNode.hidden = false;
   }
 }
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", initHeatmap);

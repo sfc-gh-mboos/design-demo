@@ -22,6 +22,8 @@ def migrate_add_columns(conn):
         conn.execute("ALTER TABLE tasks ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP")
     if "completed_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT")
+    if "is_focus" not in cols:
+        conn.execute("ALTER TABLE tasks ADD COLUMN is_focus INTEGER NOT NULL DEFAULT 0")
     # Backfill existing rows
     conn.execute(
         "UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL OR created_at = ''"
@@ -41,7 +43,8 @@ def init_db():
             category TEXT NOT NULL DEFAULT 'Planning',
             priority TEXT NOT NULL DEFAULT 'medium',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            completed_at TEXT
+            completed_at TEXT,
+            is_focus INTEGER NOT NULL DEFAULT 0
         )"""
     )
     migrate_add_columns(conn)
@@ -66,6 +69,21 @@ def normalize_priority(priority):
     valid = {"high", "medium", "low"}
     if priority and str(priority).strip().lower() in valid:
         return str(priority).strip().lower()
+    return None
+
+
+def normalize_is_focus(value):
+    """Return 0 or 1, or None if value cannot be interpreted as boolean."""
+    if value is True or value == 1:
+        return 1
+    if value is False or value == 0:
+        return 0
+    if isinstance(value, str):
+        s = value.strip().lower()
+        if s in ("true", "1", "yes"):
+            return 1
+        if s in ("false", "0", "no", ""):
+            return 0
     return None
 
 
@@ -161,10 +179,14 @@ def create_task():
         return jsonify({"error": "title is required"}), 400
     category = data.get("category", "Planning").strip() or "Planning"
     priority = normalize_priority(data.get("priority")) or "medium"
+    focus_raw = data.get("is_focus")
+    is_focus = 0 if focus_raw is None else normalize_is_focus(focus_raw)
+    if is_focus is None:
+        return jsonify({"error": "is_focus must be a boolean"}), 400
     conn = get_db()
     cursor = conn.execute(
-        "INSERT INTO tasks (title, status, category, priority) VALUES (?, 'todo', ?, ?)",
-        (title, category, priority),
+        "INSERT INTO tasks (title, status, category, priority, is_focus) VALUES (?, 'todo', ?, ?, ?)",
+        (title, category, priority, is_focus),
     )
     conn.commit()
     row = conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone()
@@ -196,14 +218,24 @@ def update_task(task_id):
         new_priority = existing["priority"]
     new_status = data.get("status", existing["status"])
     completed_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if new_status == "done" else None
+    if new_status == "done":
+        new_is_focus = 0
+    elif "is_focus" in data:
+        new_is_focus = normalize_is_focus(data.get("is_focus"))
+        if new_is_focus is None:
+            conn.close()
+            return jsonify({"error": "is_focus must be a boolean"}), 400
+    else:
+        new_is_focus = int(existing["is_focus"] or 0)
     conn.execute(
-        "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=? WHERE id=?",
+        "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=?, is_focus=? WHERE id=?",
         (
             new_title,
             new_status,
             data.get("category", existing["category"]),
             new_priority,
             completed_at,
+            new_is_focus,
             task_id,
         ),
     )
@@ -395,7 +427,7 @@ def _generate_analytics_data(cohort, start_date=None, end_date=None):
             "weekly_progress": weekly_progress,
             "priority_focus": priority_focus,
             "productivity_score": productivity_score,
-            "daily_volume": daily_volume
+            "daily_volume": daily_volume,
         }
     }
 
