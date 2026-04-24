@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
   <header class="topbar">
     <div class="topbar-inner">
       <div class="logo">
@@ -26,44 +27,41 @@
       <h1>Activity Heatmap</h1>
     </section>
 
-    <section class="heatmap-summary" id="heatmapStats" aria-live="polite">
-      <article class="heatmap-summary-item">
-        <p class="heatmap-summary-label">Current Streak</p>
-        <p class="heatmap-summary-value" id="statCurrentStreak">
-          <span class="heatmap-summary-number">--</span>
+    <section class="heatmap-summary" aria-label="Activity summary">
+      <div class="heatmap-summary-item">
+        <div class="heatmap-summary-label">Current Streak</div>
+        <div class="heatmap-summary-value">
+          <span class="heatmap-summary-number" id="heatmapCurrentStreak">--</span>
           <span class="heatmap-summary-unit">days</span>
-        </p>
-      </article>
-      <article class="heatmap-summary-item">
-        <p class="heatmap-summary-label">Longest Streak</p>
-        <p class="heatmap-summary-value" id="statLongestStreak">
-          <span class="heatmap-summary-number">--</span>
+        </div>
+      </div>
+      <div class="heatmap-summary-item">
+        <div class="heatmap-summary-label">Longest Streak</div>
+        <div class="heatmap-summary-value">
+          <span class="heatmap-summary-number" id="heatmapLongestStreak">--</span>
           <span class="heatmap-summary-unit">days</span>
-        </p>
-      </article>
-      <article class="heatmap-summary-item">
-        <p class="heatmap-summary-label">Total Completions</p>
-        <p class="heatmap-summary-value" id="statTotal">
-          <span class="heatmap-summary-number">--</span>
-        </p>
-      </article>
+        </div>
+      </div>
+      <div class="heatmap-summary-item">
+        <div class="heatmap-summary-label">Total Completions</div>
+        <div class="heatmap-summary-value">
+          <span class="heatmap-summary-number" id="heatmapTotalCompletions">--</span>
+        </div>
+      </div>
     </section>
 
-    <section class="heatmap-card">
-      <p class="heatmap-error" id="heatmapError" role="alert" hidden></p>
+    <section class="heatmap-card" aria-label="Activity by day">
+      <p class="heatmap-error" id="heatmapError" hidden>Unable to load heatmap right now.</p>
       <div class="heatmap-scroll">
-        <div class="heatmap-board" id="heatmapBoard" aria-label="Task completion heatmap for the last 12 weeks"></div>
-      </div>
-      <div class="heatmap-legend" aria-hidden="true">
-        <span class="heatmap-legend-text">Less</span>
-        <div class="heatmap-legend-cells">
-          <span class="heatmap-cell heatmap-cell--level-0"></span>
-          <span class="heatmap-cell heatmap-cell--level-1"></span>
-          <span class="heatmap-cell heatmap-cell--level-2"></span>
-          <span class="heatmap-cell heatmap-cell--level-3"></span>
-          <span class="heatmap-cell heatmap-cell--level-4"></span>
-          <span class="heatmap-cell heatmap-cell--level-5"></span>
+        <div class="heatmap-board-inner">
+          <div class="heatmap-month-row" id="heatmapMonthRow"></div>
+          <div id="heatmapRows"></div>
         </div>
+      </div>
+
+      <div class="heatmap-legend">
+        <span class="heatmap-legend-text">Less</span>
+        <div class="heatmap-legend-cells" id="heatmapLegendCells"></div>
         <span class="heatmap-legend-text">More</span>
       </div>
     </section>
