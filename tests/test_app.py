@@ -16,14 +16,21 @@ def test_analytics_trends_excludes_delivery_timeline(client):
     assert "delivery_timeline" not in data
 
 
-def test_heatmap_api_removed(client):
+def test_heatmap_api_endpoint(client):
     resp = client.get("/api/analytics/heatmap")
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "summary" in data
+    assert "grid" in data
+    assert "current_streak" in data["summary"]
+    assert "longest_streak" in data["summary"]
+    assert "total_completions" in data["summary"]
+    assert isinstance(data["grid"], list)
 
 
-def test_heatmap_page_removed(client):
+def test_heatmap_page(client):
     resp = client.get("/heatmap")
-    assert resp.status_code == 404
+    assert resp.status_code == 200
 
 
 def test_tasks_response_excludes_is_focus(client):

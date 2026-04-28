@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Heatmap - Taskflow</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/heatmap" class="nav-link active">Heatmap</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="analytics-container heatmap-container">
+    <section class="heatmap-page-heading">
+      <h1>Activity Heatmap</h1>
+    </section>
+
+    <div class="heatmap-summary" id="heatmapSummary">
+      <div class="heatmap-summary-item">
+        <div class="heatmap-summary-label">Current Streak</div>
+        <div class="heatmap-summary-value">
+          <span class="heatmap-summary-number" id="currentStreak">--</span>
+          <span class="heatmap-summary-unit">days</span>
+        </div>
+      </div>
+      <div class="heatmap-summary-item">
+        <div class="heatmap-summary-label">Longest Streak</div>
+        <div class="heatmap-summary-value">
+          <span class="heatmap-summary-number" id="longestStreak">--</span>
+          <span class="heatmap-summary-unit">days</span>
+        </div>
+      </div>
+      <div class="heatmap-summary-item">
+        <div class="heatmap-summary-label">Total Completions</div>
+        <div class="heatmap-summary-value">
+          <span class="heatmap-summary-number" id="totalCompletions">--</span>
+          <span class="heatmap-summary-unit">tasks</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="heatmap-card">
+      <div id="heatmapError" class="heatmap-error" style="display: none;"></div>
+      <div class="heatmap-scroll">
+        <div class="heatmap-board-inner" id="heatmapBoard"></div>
+      </div>
+      <div class="heatmap-legend">
+        <span class="heatmap-legend-text">Less</span>
+        <div class="heatmap-legend-cells">
+          <div class="heatmap-cell heatmap-cell--level-0"></div>
+          <div class="heatmap-cell heatmap-cell--level-1"></div>
+          <div class="heatmap-cell heatmap-cell--level-2"></div>
+          <div class="heatmap-cell heatmap-cell--level-3"></div>
+          <div class="heatmap-cell heatmap-cell--level-4"></div>
+          <div class="heatmap-cell heatmap-cell--level-5"></div>
+        </div>
+        <span class="heatmap-legend-text">More</span>
+      </div>
+    </div>
+  </main>
+
+  <script src="heatmap.js"></script>
+</body>
+</html>

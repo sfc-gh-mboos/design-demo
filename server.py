@@ -465,6 +465,111 @@ def analytics_page():
     return send_from_directory(".", "analytics.html")
 
 
+def _heatmap_summary():
+    """Compute current streak, longest streak, and total completions from tasks.completed_at."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT DATE(completed_at) as day FROM tasks WHERE completed_at IS NOT NULL ORDER BY completed_at"
+    ).fetchall()
+    conn.close()
+    
+    if not rows:
+        return {"current_streak": 0, "longest_streak": 0, "total_completions": 0}
+    
+    days = [row["day"] for row in rows]
+    unique_days = sorted(set(days))
+    total_completions = len(days)
+    
+    today = datetime.now(timezone.utc).date()
+    
+    # Current streak: consecutive days ending today or yesterday
+    current_streak = 0
+    check_date = today
+    unique_days_set = set(unique_days)
+    
+    while check_date.isoformat() in unique_days_set:
+        current_streak += 1
+        check_date -= timedelta(days=1)
+    
+    # If no completion today, check if streak ended yesterday
+    if current_streak == 0 and (today - timedelta(days=1)).isoformat() in unique_days_set:
+        check_date = today - timedelta(days=1)
+        while check_date.isoformat() in unique_days_set:
+            current_streak += 1
+            check_date -= timedelta(days=1)
+    
+    # Longest streak: scan all consecutive runs
+    longest_streak = 0
+    streak = 1
+    for i in range(1, len(unique_days)):
+        prev = datetime.strptime(unique_days[i - 1], "%Y-%m-%d").date()
+        curr = datetime.strptime(unique_days[i], "%Y-%m-%d").date()
+        if (curr - prev).days == 1:
+            streak += 1
+        else:
+            longest_streak = max(longest_streak, streak)
+            streak = 1
+    longest_streak = max(longest_streak, streak)
+    
+    return {
+        "current_streak": current_streak,
+        "longest_streak": longest_streak,
+        "total_completions": total_completions
+    }
+
+
+def _build_heatmap_grid():
+    """Build 12-week grid (Monday-first) with completion counts per day."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT DATE(completed_at) as day, COUNT(*) as count FROM tasks WHERE completed_at IS NOT NULL GROUP BY day"
+    ).fetchall()
+    conn.close()
+    
+    counts = {row["day"]: row["count"] for row in rows}
+    
+    today = datetime.now(timezone.utc).date()
+    # Find the most recent Monday
+    days_since_monday = today.weekday()
+    end_of_week = today + timedelta(days=(6 - days_since_monday))
+    
+    # 12 weeks back from end of current week
+    weeks = []
+    for week_idx in range(11, -1, -1):
+        week_end = end_of_week - timedelta(weeks=week_idx)
+        week_start = week_end - timedelta(days=6)
+        week_data = {
+            "start": week_start.isoformat(),
+            "days": []
+        }
+        for day_offset in range(7):
+            day = week_start + timedelta(days=day_offset)
+            day_str = day.isoformat()
+            count = counts.get(day_str, 0)
+            week_data["days"].append({
+                "date": day_str,
+                "count": count
+            })
+        weeks.append(week_data)
+    
+    return weeks
+
+
+@app.route("/api/analytics/heatmap", methods=["GET"])
+def analytics_heatmap():
+    summary = _heatmap_summary()
+    grid = _build_heatmap_grid()
+    return jsonify({
+        "summary": summary,
+        "grid": grid
+    })
+
+
+@app.route("/heatmap")
+def heatmap_page():
+    return send_from_directory(".", "heatmap.html")
+
+
 if __name__ == "__main__":
     init_db()
     app.run(debug=True, port=8080)
