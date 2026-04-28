@@ -15,15 +15,13 @@ def get_db():
 
 
 def migrate_add_columns(conn):
-    """Add created_at, completed_at, and is_focus if they don't exist."""
+    """Add created_at and completed_at if they don't exist."""
     cursor = conn.execute("PRAGMA table_info(tasks)")
     cols = [row[1] for row in cursor.fetchall()]
     if "created_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP")
     if "completed_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT")
-    if "is_focus" not in cols:
-        conn.execute("ALTER TABLE tasks ADD COLUMN is_focus INTEGER NOT NULL DEFAULT 0")
     # Backfill existing rows
     conn.execute(
         "UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL OR created_at = ''"
@@ -43,8 +41,7 @@ def init_db():
             category TEXT NOT NULL DEFAULT 'Planning',
             priority TEXT NOT NULL DEFAULT 'medium',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            completed_at TEXT,
-            is_focus INTEGER NOT NULL DEFAULT 0
+            completed_at TEXT
         )"""
     )
     migrate_add_columns(conn)
@@ -59,6 +56,9 @@ def row_to_dict(row):
     return {key: row[key] for key in row.keys()}
 
 
+TASK_COLUMNS = "id, title, status, category, priority, created_at, completed_at"
+
+
 def normalize_title(title):
     if not title or not str(title).strip():
         return None
@@ -70,19 +70,6 @@ def normalize_priority(priority):
     if priority and str(priority).strip().lower() in valid:
         return str(priority).strip().lower()
     return None
-
-
-def normalize_is_focus(value):
-    """Coerce JSON/body value to 0 or 1 for SQLite."""
-    if value is None:
-        return 0
-    if isinstance(value, bool):
-        return 1 if value else 0
-    if isinstance(value, (int, float)):
-        return 1 if int(value) else 0
-    if isinstance(value, str):
-        return 1 if value.strip().lower() in ("1", "true", "yes") else 0
-    return 1 if value else 0
 
 
 def generate_demo_data(conn):
@@ -159,19 +146,18 @@ def index():
 def get_tasks():
     conn = get_db()
     status = request.args.get("status")
-    focus_only = request.args.get("focus", "").lower() in ("1", "true", "yes")
     conditions = []
     params = []
     if status and status != "all":
         conditions.append("status = ?")
         params.append(status)
-    if focus_only:
-        conditions.append("is_focus = 1")
     if conditions:
         where = " AND ".join(conditions)
-        rows = conn.execute(f"SELECT * FROM tasks WHERE {where}", params).fetchall()
+        rows = conn.execute(
+            f"SELECT {TASK_COLUMNS} FROM tasks WHERE {where}", params
+        ).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM tasks").fetchall()
+        rows = conn.execute(f"SELECT {TASK_COLUMNS} FROM tasks").fetchall()
     conn.close()
     return jsonify([row_to_dict(r) for r in rows])
 
@@ -184,32 +170,26 @@ def create_task():
         return jsonify({"error": "title is required"}), 400
     category = data.get("category", "Planning").strip() or "Planning"
     priority = normalize_priority(data.get("priority")) or "medium"
-    is_focus = normalize_is_focus(data.get("is_focus")) if "is_focus" in data else 0
     conn = get_db()
     cursor = conn.execute(
-        "INSERT INTO tasks (title, status, category, priority, is_focus) VALUES (?, 'todo', ?, ?, ?)",
-        (title, category, priority, is_focus),
+        "INSERT INTO tasks (title, status, category, priority) VALUES (?, 'todo', ?, ?)",
+        (title, category, priority),
     )
     conn.commit()
-    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    row = conn.execute(
+        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (cursor.lastrowid,)
+    ).fetchone()
     conn.close()
     return jsonify(row_to_dict(row)), 201
-
-
-@app.route("/api/tasks/clear-focus", methods=["POST"])
-def clear_focus():
-    conn = get_db()
-    conn.execute("UPDATE tasks SET is_focus = 0 WHERE is_focus = 1")
-    conn.commit()
-    conn.close()
-    return "", 204
 
 
 @app.route("/api/tasks/<int:task_id>", methods=["PUT"])
 def update_task(task_id):
     data = request.get_json(silent=True) or {}
     conn = get_db()
-    existing = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    existing = conn.execute(
+        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)
+    ).fetchone()
     if not existing:
         conn.close()
         return jsonify({"error": "task not found"}), 404
@@ -228,25 +208,20 @@ def update_task(task_id):
     else:
         new_priority = existing["priority"]
     new_status = data.get("status", existing["status"])
-    if "is_focus" in data:
-        new_is_focus = normalize_is_focus(data.get("is_focus"))
-    else:
-        new_is_focus = int(existing["is_focus"] or 0)
     completed_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if new_status == "done" else None
     conn.execute(
-        "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=?, is_focus=? WHERE id=?",
+        "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=? WHERE id=?",
         (
             new_title,
             new_status,
             data.get("category", existing["category"]),
             new_priority,
             completed_at,
-            new_is_focus,
             task_id,
         ),
     )
     conn.commit()
-    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    row = conn.execute(f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
     conn.close()
     return jsonify(row_to_dict(row))
 
@@ -254,7 +229,9 @@ def update_task(task_id):
 @app.route("/api/tasks/<int:task_id>", methods=["DELETE"])
 def delete_task(task_id):
     conn = get_db()
-    existing = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    existing = conn.execute(
+        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)
+    ).fetchone()
     if not existing:
         conn.close()
         return jsonify({"error": "task not found"}), 404
@@ -483,149 +460,9 @@ def analytics_trends():
     return jsonify(data["trends"])
 
 
-HEATMAP_WEEKS = 12
-HEATMAP_DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-
-def _start_of_week(day):
-    return day - timedelta(days=day.weekday())
-
-
-def _heatmap_level(count, max_count):
-    if count <= 0 or max_count <= 0:
-        return 0
-    return min(5, max(1, int((count / max_count) * 5 + 0.9999)))
-
-
-def _compute_streaks(completion_dates, today):
-    if not completion_dates:
-        return 0, 0
-
-    sorted_dates = sorted(completion_dates)
-    longest_streak = 0
-    running = 0
-    previous = None
-    for current_date in sorted_dates:
-        if previous and current_date == previous + timedelta(days=1):
-            running += 1
-        else:
-            running = 1
-        longest_streak = max(longest_streak, running)
-        previous = current_date
-
-    current_streak = 0
-    cursor = today
-    while cursor in completion_dates:
-        current_streak += 1
-        cursor -= timedelta(days=1)
-
-    return current_streak, longest_streak
-
-
-def _build_heatmap_payload():
-    today = datetime.now(timezone.utc).date()
-    current_week_start = _start_of_week(today)
-    window_start = current_week_start - timedelta(weeks=HEATMAP_WEEKS - 1)
-    window_end = current_week_start + timedelta(days=6)
-
-    conn = get_db()
-    window_rows = conn.execute(
-        """
-        SELECT date(completed_at) AS completed_date, COUNT(*) AS completion_count
-        FROM tasks
-        WHERE completed_at IS NOT NULL
-          AND completed_at != ''
-          AND date(completed_at) BETWEEN ? AND ?
-        GROUP BY date(completed_at)
-        """,
-        (window_start.isoformat(), window_end.isoformat()),
-    ).fetchall()
-
-    all_completion_dates_rows = conn.execute(
-        """
-        SELECT DISTINCT date(completed_at) AS completed_date
-        FROM tasks
-        WHERE completed_at IS NOT NULL
-          AND completed_at != ''
-        ORDER BY completed_date ASC
-        """
-    ).fetchall()
-
-    total_completions = conn.execute(
-        """
-        SELECT COUNT(*) AS total
-        FROM tasks
-        WHERE completed_at IS NOT NULL
-          AND completed_at != ''
-        """
-    ).fetchone()["total"]
-    conn.close()
-
-    completions_by_date = {}
-    for row in window_rows:
-        if row["completed_date"]:
-            completions_by_date[datetime.strptime(row["completed_date"], "%Y-%m-%d").date()] = row["completion_count"]
-
-    completion_dates = set()
-    for row in all_completion_dates_rows:
-        if row["completed_date"]:
-            completion_dates.add(datetime.strptime(row["completed_date"], "%Y-%m-%d").date())
-
-    current_streak_days, longest_streak_days = _compute_streaks(completion_dates, today)
-    max_daily_completions = max(completions_by_date.values(), default=0)
-
-    month_labels = []
-    rows = [{"label": label, "cells": []} for label in HEATMAP_DAY_LABELS]
-    previous_month = None
-
-    for week_index in range(HEATMAP_WEEKS):
-        week_start = window_start + timedelta(weeks=week_index)
-        if week_index == 0 or week_start.month != previous_month:
-            month_labels.append(week_start.strftime("%b"))
-        else:
-            month_labels.append("")
-        previous_month = week_start.month
-
-        for day_index in range(7):
-            cell_date = week_start + timedelta(days=day_index)
-            count = completions_by_date.get(cell_date, 0)
-            rows[day_index]["cells"].append(
-                {
-                    "date": cell_date.isoformat(),
-                    "count": count,
-                    "level": _heatmap_level(count, max_daily_completions),
-                }
-            )
-
-    return {
-        "summary": {
-            "current_streak_days": current_streak_days,
-            "longest_streak_days": longest_streak_days,
-            "total_completions": total_completions,
-        },
-        "month_labels": month_labels,
-        "rows": rows,
-        "legend_levels": [0, 1, 2, 3, 4, 5],
-        "range": {
-            "start_date": window_start.isoformat(),
-            "end_date": window_end.isoformat(),
-        },
-    }
-
-
-@app.route("/api/analytics/heatmap", methods=["GET"])
-def analytics_heatmap():
-    return jsonify(_build_heatmap_payload())
-
-
 @app.route("/analytics")
 def analytics_page():
     return send_from_directory(".", "analytics.html")
-
-
-@app.route("/heatmap")
-def heatmap_page():
-    return send_from_directory(".", "heatmap.html")
 
 
 if __name__ == "__main__":

@@ -493,7 +493,12 @@ body {
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
   transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-  cursor: default;
+  cursor: grab;
+}
+
+.task-card.dragging {
+  opacity: 0.55;
+  cursor: grabbing;
 }
 
 .task-card:hover {
