@@ -1,4 +1,32 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const TASK_PREFS_KEY = "taskflow.taskDefaults";
+
+  function loadTaskDefaults() {
+    try {
+      const raw = localStorage.getItem(TASK_PREFS_KEY);
+      if (!raw) return { category: "Planning", priority: "medium" };
+      const parsed = JSON.parse(raw);
+      const category =
+        typeof parsed.category === "string" ? parsed.category : "Planning";
+      const priority =
+        typeof parsed.priority === "string" ? parsed.priority : "medium";
+      return { category, priority };
+    } catch {
+      return { category: "Planning", priority: "medium" };
+    }
+  }
+
+  function saveTaskDefaults(category, priority) {
+    try {
+      localStorage.setItem(
+        TASK_PREFS_KEY,
+        JSON.stringify({ category, priority })
+      );
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }
+
   const filters = document.getElementById("filters");
   const viewToggle = document.getElementById("viewToggle");
   const taskList = document.getElementById("taskList");
@@ -121,7 +149,9 @@ document.addEventListener("DOMContentLoaded", () => {
     li.dataset.id = task.id;
 
     li.innerHTML = `
-      <div class="status-indicator status-${task.status}"></div>
+      <button type="button" class="status-hitbox">
+        <span class="status-indicator status-${task.status}" aria-hidden="true"></span>
+      </button>
       <div class="task-body">
         <span class="task-title">${task.title}</span>
         <span class="task-meta">${task.category}</span>
@@ -129,11 +159,15 @@ document.addEventListener("DOMContentLoaded", () => {
       <span class="priority priority-${task.priority}">${PRIORITY_LABELS[task.priority] || task.priority}</span>
     `;
 
-    const statusDot = li.querySelector(".status-indicator");
-    statusDot.style.cursor = "pointer";
-    statusDot.title = "Cycle status";
-    statusDot.addEventListener("click", (e) => {
+    const statusBtn = li.querySelector(".status-hitbox");
+    statusBtn.setAttribute("aria-label", `Advance status: ${task.title}`);
+    statusBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      cycleStatus(task);
+    });
+
+    li.addEventListener("click", (e) => {
+      if (e.target.closest(".status-hitbox")) return;
       cycleStatus(task);
     });
 
@@ -395,23 +429,62 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Add Task Modal ---
 
   const addTaskBtn = document.getElementById("addTaskBtn");
+  const openDetailsAdd = document.getElementById("openDetailsAdd");
+  const quickAddForm = document.getElementById("quickAddForm");
+  const quickAddInput = document.getElementById("quickAddInput");
   const addTaskModal = document.getElementById("addTaskModal");
   const addTaskForm = document.getElementById("addTaskForm");
   const modalClose = document.getElementById("modalClose");
   const taskTitleInput = document.getElementById("taskTitleInput");
+  const taskCategorySelect = document.getElementById("taskCategorySelect");
+  const taskPrioritySelect = document.getElementById("taskPrioritySelect");
+  const taskDetailsToggle = document.getElementById("taskDetailsToggle");
 
-  function openModal() {
+  function applyDefaultsToModalForm() {
+    const { category, priority } = loadTaskDefaults();
+    if (taskCategorySelect) {
+      const opt = Array.from(taskCategorySelect.options).find(
+        (o) => o.value === category
+      );
+      taskCategorySelect.value = opt ? category : "Planning";
+    }
+    if (taskPrioritySelect) {
+      const opt = Array.from(taskPrioritySelect.options).find(
+        (o) => o.value === priority
+      );
+      taskPrioritySelect.value = opt ? priority : "medium";
+    }
+  }
+
+  function openModal(prefillTitle) {
     addTaskModal.classList.remove("hidden");
+    applyDefaultsToModalForm();
+    if (typeof prefillTitle === "string" && prefillTitle.trim()) {
+      taskTitleInput.value = prefillTitle.trim();
+    }
+    if (taskDetailsToggle) {
+      const hasNonDefault =
+        (taskCategorySelect && taskCategorySelect.value !== "Planning") ||
+        (taskPrioritySelect && taskPrioritySelect.value !== "medium");
+      taskDetailsToggle.open = Boolean(hasNonDefault);
+    }
     taskTitleInput.focus();
+    taskTitleInput.select();
   }
 
   function closeModal() {
     addTaskModal.classList.add("hidden");
     addTaskForm.reset();
+    applyDefaultsToModalForm();
   }
 
-  addTaskBtn.addEventListener("click", openModal);
-  modalClose.addEventListener("click", closeModal);
+  addTaskBtn.addEventListener("click", () => openModal());
+  if (openDetailsAdd) {
+    openDetailsAdd.addEventListener("click", () => {
+      const draft = quickAddInput ? quickAddInput.value.trim() : "";
+      openModal(draft);
+    });
+  }
 
   addTaskModal.addEventListener("click", (e) => {
     if (e.target === addTaskModal) closeModal();
@@ -428,17 +501,38 @@ document.addEventListener("DOMContentLoaded", () => {
     const title = taskTitleInput.value.trim();
     if (!title) return;
 
-    const category = document.getElementById("taskCategorySelect").value;
-    const priority = document.getElementById("taskPrioritySelect").value;
+    const category = taskCategorySelect.value;
+    const priority = taskPrioritySelect.value;
 
     try {
       await TaskAPI.create({ title, category, priority });
+      saveTaskDefaults(category, priority);
       closeModal();
       await loadTasks();
     } catch (err) {
       showErrorFeedback(err.message || "Failed to add task.");
     }
   });
+
+  if (quickAddForm && quickAddInput) {
+    quickAddForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = quickAddInput.value.trim();
+      if (!title) return;
+      const { category, priority } = loadTaskDefaults();
+      quickAddInput.disabled = true;
+      try {
+        await TaskAPI.create({ title, category, priority });
+        quickAddInput.value = "";
+        await loadTasks();
+        quickAddInput.focus();
+      } catch (err) {
+        showErrorFeedback(err.message || "Failed to add task.");
+      } finally {
+        quickAddInput.disabled = false;
+      }
+    });
+  }
 
   // --- Init ---
 

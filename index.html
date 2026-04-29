@@ -23,8 +23,28 @@
 
   <main class="container">
     <section class="hero hero--tasks" aria-labelledby="heroTitle">
+      <p class="hero-eyebrow hero-eyebrow--tasks">Today</p>
       <h1 id="heroTitle">Daily Tasks</h1>
     </section>
+
+    <div class="quick-add-shell">
+    <form id="quickAddForm" class="quick-add" autocomplete="off" aria-label="Quick add task">
+      <label class="sr-only" for="quickAddInput">What needs to be done?</label>
+      <input
+        id="quickAddInput"
+        class="quick-add-input"
+        type="text"
+        placeholder="Add a task, press Enter"
+        maxlength="500"
+        autocomplete="off"
+      >
+      <button type="submit" class="quick-add-submit" aria-label="Add task">Add</button>
+    </form>
+    <p class="quick-add-meta">
+      <span class="quick-add-hint">Uses your last category and priority, or defaults.</span>
+      <button type="button" class="quick-add-link" id="openDetailsAdd">More options…</button>
+    </p>
+    </div>
 
     <div class="toolbar">
       <div class="toolbar-left">
@@ -39,7 +59,7 @@
         <button class="view-toggle-btn active" type="button" data-view="list" role="tab" aria-selected="true">List</button>
         <button class="view-toggle-btn" type="button" data-view="board" role="tab" aria-selected="false">Board</button>
       </div>
-      <button class="add-task-btn" id="addTaskBtn" type="button" aria-label="Add task">+ Add Task</button>
+      <button class="add-task-btn add-task-btn--secondary" id="addTaskBtn" type="button" aria-label="Add task with category and priority">Details</button>
     </div>
 
     <section class="list-view" id="listView" aria-label="Task list">
@@ -89,19 +109,22 @@
           required
           autocomplete="off"
         >
-        <label class="form-label" for="taskCategorySelect">Category</label>
-        <select id="taskCategorySelect" class="form-select">
-          <option value="Planning">Planning</option>
-          <option value="Design">Design</option>
-          <option value="Engineering">Engineering</option>
-          <option value="Operations">Operations</option>
-        </select>
-        <label class="form-label" for="taskPrioritySelect">Priority</label>
-        <select id="taskPrioritySelect" class="form-select">
-          <option value="medium" selected>Medium</option>
-          <option value="high">High</option>
-          <option value="low">Low</option>
-        </select>
+        <details class="modal-details" id="taskDetailsToggle">
+          <summary class="modal-details-summary">Category and priority</summary>
+          <label class="form-label" for="taskCategorySelect">Category</label>
+          <select id="taskCategorySelect" class="form-select">
+            <option value="Planning">Planning</option>
+            <option value="Design">Design</option>
+            <option value="Engineering">Engineering</option>
+            <option value="Operations">Operations</option>
+          </select>
+          <label class="form-label" for="taskPrioritySelect">Priority</label>
+          <select id="taskPrioritySelect" class="form-select">
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="low">Low</option>
+          </select>
+        </details>
         <button type="submit" class="form-submit">Add Task</button>
       </form>
     </div>
