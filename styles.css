@@ -1143,23 +1143,24 @@ body {
 }
 
 .heatmap-page {
-  max-width: 1060px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 32px 24px 80px;
+  padding: 32px 50px 80px;
 }
 
 .heatmap-header h1 {
-  font-size: 2rem;
-  line-height: 1.2;
-  letter-spacing: -0.03em;
-  color: #0a0a0a;
+  font-size: 20px;
+  line-height: 30px;
+  letter-spacing: -0.022em;
+  color: var(--fg);
+  font-weight: 500;
 }
 
 .heatmap-stats {
   display: flex;
   gap: 32px;
   margin-top: 20px;
-  margin-bottom: 38px;
+  margin-bottom: 24px;
 }
 
 .heatmap-stat {
@@ -1175,10 +1176,10 @@ body {
 
 .heatmap-stat-value {
   margin-top: 4px;
-  font-size: 42px;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  color: #0a0a0a;
+  font-size: 30px;
+  line-height: 36px;
+  letter-spacing: 0.013em;
+  color: var(--fg);
   font-weight: 500;
   display: inline-flex;
   align-items: baseline;
@@ -1186,15 +1187,16 @@ body {
 }
 
 .heatmap-stat-unit {
-  font-size: 28px;
+  font-size: 20px;
+  line-height: 28px;
   letter-spacing: -0.02em;
 }
 
 .heatmap-card {
   background: #fff;
-  border: 1px solid var(--card-border);
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 10px;
-  padding: 24px 22px;
+  padding: 25px;
 }
 
 .heatmap-grid-shell {
@@ -1203,7 +1205,7 @@ body {
 
 .heatmap-month-labels {
   margin-left: 40px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 4px;
@@ -1250,12 +1252,12 @@ body {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows: repeat(7, minmax(0, 1fr));
   gap: 4px;
-  min-height: 512px;
+  min-height: 511px;
 }
 
 .heatmap-cell {
   width: 100%;
-  min-height: 68px;
+  min-height: 69px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 6px;
   background: #fff;
@@ -1302,12 +1304,12 @@ body {
 }
 
 .heatmap-legend {
-  margin-top: 18px;
+  margin-top: 12px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   color: #717182;
-  font-size: 24px;
+  font-size: 12px;
   line-height: 16px;
 }
 
