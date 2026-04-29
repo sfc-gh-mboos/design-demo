@@ -3,6 +3,116 @@ document.addEventListener("DOMContentLoaded", () => {
   const startDateInput = document.getElementById("startDate");
   const endDateInput = document.getElementById("endDate");
   const datePresetBtns = document.querySelectorAll(".date-preset-btn");
+  const assistMessage = document.getElementById("assistMessage");
+  const assistActions = document.getElementById("assistActions");
+  const openPaletteBtn = document.getElementById("openPaletteBtn");
+  const kpiGrid = document.getElementById("kpiGrid");
+
+  const VALID_COHORTS = [
+    "all",
+    "power_users",
+    "new_users",
+    "enterprise",
+    "team_alpha",
+    "team_beta",
+  ];
+
+  function syncUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const cohort = cohortFilter.value;
+    if (cohort && cohort !== "all") {
+      params.set("cohort", cohort);
+    } else {
+      params.delete("cohort");
+    }
+    params.delete("range");
+    params.delete("start");
+    params.delete("end");
+
+    const activePreset = document.querySelector(".date-preset-btn.active");
+    if (activePreset) {
+      const d = activePreset.dataset.days;
+      if (d && d !== "7") {
+        params.set("range", d);
+      }
+    } else if (startDateInput.value && endDateInput.value) {
+      params.set("start", startDateInput.value);
+      params.set("end", endDateInput.value);
+    }
+
+    const qs = params.toString();
+    const next = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState({}, "", next);
+  }
+
+  function applyUrlToState() {
+    const params = new URLSearchParams(window.location.search);
+    const cohort = params.get("cohort");
+    if (cohort && VALID_COHORTS.includes(cohort)) {
+      cohortFilter.value = cohort;
+    }
+    const range = params.get("range");
+    if (range === "7" || range === "30" || range === "90" || range === "all") {
+      setDateRange(range === "all" ? "all" : parseInt(range, 10));
+      setPresetActive(range);
+    }
+    const start = params.get("start");
+    const end = params.get("end");
+    if (start && end) {
+      startDateInput.value = start;
+      endDateInput.value = end;
+      setPresetActive("");
+    }
+  }
+
+  function updateAssistFromSummary(summary) {
+    if (!assistMessage || !assistActions) return;
+    assistActions.innerHTML = "";
+    const rate = Number(summary.completion_rate);
+    if (rate >= 75) {
+      assistMessage.textContent = `Completion rate is strong (${summary.completion_rate}%). Check weekly progress for momentum.`;
+    } else if (rate >= 50) {
+      assistMessage.textContent = `Completion rate is ${summary.completion_rate}%. Compare created vs completed in Weekly Progress below.`;
+    } else {
+      assistMessage.textContent = `Completion rate is ${summary.completion_rate}%. Try a shorter date range to see recent changes more clearly.`;
+      addAssistChip("Last 7 days", () => {
+        setDateRange(7);
+        setPresetActive("7");
+        syncUrl();
+        refreshAnalytics();
+      });
+    }
+    addAssistChip("Jump to charts", () => {
+      const charts = document.querySelector(".charts-grid");
+      charts && charts.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    addAssistChip("Back to tasks", () => {
+      window.location.href = "/";
+    });
+  }
+
+  function addAssistChip(label, onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "assist-chip";
+    btn.textContent = label;
+    btn.addEventListener("click", onClick);
+    assistActions.appendChild(btn);
+  }
+
+  function isMac() {
+    return /Mac|iPhone|iPad|iPod/.test(navigator.platform || "") || navigator.userAgent.includes("Mac");
+  }
+
+  const modK = isMac() ? "⌘K" : "Ctrl+K";
+  if (openPaletteBtn) {
+    const kbd = openPaletteBtn.querySelector(".palette-kbd");
+    if (kbd) kbd.textContent = modK;
+    openPaletteBtn.setAttribute("title", `Quick actions (${modK})`);
+    openPaletteBtn.addEventListener("click", () => {
+      if (window.TaskflowAssist) TaskflowAssist.openPalette();
+    });
+  }
 
   function formatDateForAPI(d) {
     return d.toISOString().slice(0, 10);
@@ -551,6 +661,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ]);
       
       updateKPIs(summary);
+      updateAssistFromSummary(summary);
       renderCategoryChart(distribution);
       renderPriorityChart(distribution);
       renderWeeklyProgressChart(trends);
@@ -573,19 +684,113 @@ document.addEventListener("DOMContentLoaded", () => {
     loadAnalytics(cohortFilter.value, start || undefined, end || undefined);
   }
 
-  // Initial load: default to 7d range
+  if (window.TaskflowAssist) {
+    TaskflowAssist.init({
+      commands: [
+        {
+          label: "Go to Tasks",
+          keywords: ["home", "list"],
+          hint: "Navigate",
+          run: () => {
+            window.location.href = "/";
+          },
+        },
+        {
+          label: "Go to Analytics",
+          keywords: ["here", "dashboard"],
+          hint: "Navigate",
+          run: () => {
+            window.location.href = "/analytics";
+          },
+        },
+        {
+          label: "Date range: Last 7 days",
+          keywords: ["week"],
+          run: () => {
+            setDateRange(7);
+            setPresetActive("7");
+            syncUrl();
+            refreshAnalytics();
+          },
+        },
+        {
+          label: "Date range: Last 30 days",
+          keywords: ["month"],
+          run: () => {
+            setDateRange(30);
+            setPresetActive("30");
+            syncUrl();
+            refreshAnalytics();
+          },
+        },
+        {
+          label: "Date range: Last 90 days",
+          keywords: ["quarter"],
+          run: () => {
+            setDateRange(90);
+            setPresetActive("90");
+            syncUrl();
+            refreshAnalytics();
+          },
+        },
+        {
+          label: "Date range: All time",
+          keywords: ["full"],
+          run: () => {
+            setDateRange("all");
+            setPresetActive("all");
+            syncUrl();
+            refreshAnalytics();
+          },
+        },
+        {
+          label: "Cohort: All users",
+          keywords: ["segment"],
+          run: () => {
+            cohortFilter.value = "all";
+            syncUrl();
+            refreshAnalytics();
+          },
+        },
+        {
+          label: "Scroll to KPI cards",
+          keywords: ["top", "summary"],
+          run: () => {
+            kpiGrid && kpiGrid.scrollIntoView({ behavior: "smooth", block: "start" });
+          },
+        },
+        {
+          label: "Scroll to charts",
+          keywords: ["graphs"],
+          run: () => {
+            const charts = document.querySelector(".charts-grid");
+            charts && charts.scrollIntoView({ behavior: "smooth", block: "start" });
+          },
+        },
+      ],
+    });
+  }
+
+  // Defaults first, then deep-link overrides (cohort, range, custom dates)
   setDateRange(7);
   setPresetActive("7");
+  if (window.location.search) {
+    applyUrlToState();
+  }
   refreshAnalytics();
 
   // Cohort filter change handler
-  cohortFilter.addEventListener("change", () => refreshAnalytics());
+  cohortFilter.addEventListener("change", () => {
+    syncUrl();
+    refreshAnalytics();
+  });
 
   // Date preset click handlers
   datePresetBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       setDateRange(btn.dataset.days);
       setPresetActive(btn.dataset.days);
+      syncUrl();
       refreshAnalytics();
     });
   });
@@ -593,10 +798,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // Custom date input handlers (clear preset selection)
   startDateInput.addEventListener("change", () => {
     setPresetActive("");
+    syncUrl();
     refreshAnalytics();
   });
   endDateInput.addEventListener("change", () => {
     setPresetActive("");
+    syncUrl();
     refreshAnalytics();
   });
 });

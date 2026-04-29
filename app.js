@@ -5,6 +5,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const listView = document.getElementById("listView");
   const boardView = document.getElementById("boardView");
   const dateLabel = document.getElementById("dateLabel");
+  const assistMessage = document.getElementById("assistMessage");
+  const assistActions = document.getElementById("assistActions");
+  const quickAddForm = document.getElementById("quickAddForm");
+  const quickAddInput = document.getElementById("quickAddInput");
+  const openPaletteBtn = document.getElementById("openPaletteBtn");
 
   if (dateLabel) {
     const now = new Date();
@@ -103,8 +108,93 @@ document.addEventListener("DOMContentLoaded", () => {
     view: "list",
   };
 
+  function syncUrl() {
+    const params = new URLSearchParams(window.location.search);
+    if (state.filter && state.filter !== "all") {
+      params.set("filter", state.filter);
+    } else {
+      params.delete("filter");
+    }
+    if (state.view && state.view !== "list") {
+      params.set("view", state.view);
+    } else {
+      params.delete("view");
+    }
+    const qs = params.toString();
+    const next = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState({}, "", next);
+  }
+
+  function applyUrlToState() {
+    const params = new URLSearchParams(window.location.search);
+    const filter = params.get("filter");
+    const view = params.get("view");
+    if (filter && ["all", "todo", "in-progress", "done"].includes(filter)) {
+      setFilter(filter, { skipUrl: true });
+    }
+    if (view === "list" || view === "board") {
+      setView(view, { skipUrl: true });
+    }
+  }
+
+  function updateAssistStrip(tasks) {
+    if (!assistMessage || !assistActions) return;
+
+    const todo = tasks.filter((t) => t.status === "todo").length;
+    const inProgress = tasks.filter((t) => t.status === "in-progress").length;
+    const highTodo = tasks.filter((t) => t.status !== "done" && t.priority === "high").length;
+
+    assistActions.innerHTML = "";
+
+    if (tasks.length === 0) {
+      assistMessage.textContent =
+        "No tasks yet. Use the quick add bar above or open the full form for category and priority.";
+      return;
+    }
+
+    if (highTodo > 0 && state.filter === "all") {
+      assistMessage.textContent = `You have ${highTodo} open high-priority task${highTodo > 1 ? "s" : ""}. Jump to your to-do list to tackle them first.`;
+      addAssistAction("Open to-do list", () => {
+        setFilter("todo");
+        loadTasks();
+        if (window.TaskflowAssist) {
+          TaskflowAssist.showToast("Filtered to To Do — High priority is labeled on each row.");
+        }
+      });
+    } else if (inProgress > 4) {
+      assistMessage.textContent = `${inProgress} tasks are in progress. Consider finishing or moving some back to To Do.`;
+      addAssistAction("View board", () => {
+        setView("board");
+        syncUrl();
+      });
+    } else if (todo > 0 && inProgress === 0) {
+      assistMessage.textContent = `${todo} task${todo > 1 ? "s are" : " is"} still to do. Pick one and move it to In progress when you start.`;
+      addAssistAction("Open board", () => {
+        setView("board");
+        syncUrl();
+      });
+    } else {
+      assistMessage.textContent =
+        "You are on track. Click the dot on a task to cycle status, or drag cards on the board.";
+    }
+
+    addAssistAction("Analytics", () => {
+      window.location.href = "/analytics";
+    });
+  }
+
+  function addAssistAction(label, onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "assist-chip";
+    btn.textContent = label;
+    btn.addEventListener("click", onClick);
+    assistActions.appendChild(btn);
+  }
+
   async function loadTasks() {
     state.tasks = await TaskAPI.getAll(state.filter);
+    updateAssistStrip(state.tasks);
     render();
   }
 
@@ -153,6 +243,15 @@ document.addEventListener("DOMContentLoaded", () => {
     listView.classList.remove("hidden");
     boardView.classList.add("hidden");
     taskList.innerHTML = "";
+    if (visibleTasks.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "task-empty";
+      empty.setAttribute("role", "status");
+      empty.innerHTML =
+        '<p class="task-empty-title">Nothing here</p><p class="task-empty-desc">Try another filter or add a task with the bar above.</p>';
+      taskList.appendChild(empty);
+      return;
+    }
     visibleTasks.forEach((task) => taskList.appendChild(renderTask(task)));
   }
 
@@ -350,21 +449,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 3000);
   }
 
-  function setFilter(filter) {
+  function setFilter(filter, opts) {
+    const skipUrl = opts && opts.skipUrl;
+
     const currentActive = filters.querySelector(".active");
     if (currentActive) {
       currentActive.classList.remove("active");
+      currentActive.setAttribute("aria-selected", "false");
     }
 
     const nextActive = filters.querySelector(`[data-filter="${filter}"]`);
     if (nextActive) {
       nextActive.classList.add("active");
+      nextActive.setAttribute("aria-selected", "true");
     }
 
     state.filter = filter;
+    if (!skipUrl) syncUrl();
   }
 
-  function setView(view) {
+  function setView(view, opts) {
+    const skipUrl = opts && opts.skipUrl;
     state.view = view;
     const buttons = viewToggle.querySelectorAll(".view-toggle-btn");
     buttons.forEach((button) => {
@@ -372,10 +477,10 @@ document.addEventListener("DOMContentLoaded", () => {
       button.classList.toggle("active", isActive);
       button.setAttribute("aria-selected", isActive ? "true" : "false");
     });
-    // Reset drop zones setup when switching views
     if (view === "board") {
       columnDropZonesSetup = false;
     }
+    if (!skipUrl) syncUrl();
     render();
   }
 
@@ -390,6 +495,7 @@ document.addEventListener("DOMContentLoaded", () => {
   viewToggle.addEventListener("click", (e) => {
     if (!e.target.matches(".view-toggle-btn")) return;
     setView(e.target.dataset.view);
+    syncUrl();
   });
 
   // --- Add Task Modal ---
@@ -440,7 +546,133 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // --- Quick add ---
+
+  if (quickAddForm && quickAddInput) {
+    quickAddForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = quickAddInput.value.trim();
+      if (!title) return;
+      const category = document.getElementById("quickAddCategory").value;
+      const priority = document.getElementById("quickAddPriority").value;
+      try {
+        await TaskAPI.create({ title, category, priority });
+        quickAddInput.value = "";
+        quickAddInput.focus();
+        await loadTasks();
+        if (window.TaskflowAssist) {
+          TaskflowAssist.showToast("Task added");
+        }
+      } catch (err) {
+        showErrorFeedback(err.message || "Failed to add task.");
+      }
+    });
+  }
+
+  // --- Command palette & assist ---
+
+  function isMac() {
+    return /Mac|iPhone|iPad|iPod/.test(navigator.platform || "") || navigator.userAgent.includes("Mac");
+  }
+
+  const modK = isMac() ? "⌘K" : "Ctrl+K";
+
+  if (openPaletteBtn) {
+    openPaletteBtn.querySelector(".palette-kbd").textContent = modK;
+    openPaletteBtn.setAttribute("title", `Quick actions (${modK})`);
+    openPaletteBtn.addEventListener("click", () => {
+      if (window.TaskflowAssist) TaskflowAssist.openPalette();
+    });
+  }
+
+  const heroSub = document.querySelector(".hero-subtitle");
+  if (heroSub) {
+    heroSub.innerHTML = `Tip: press <kbd class="inline-kbd">${modK}</kbd> anytime for navigation and shortcuts.`;
+  }
+
+  if (window.TaskflowAssist) {
+    TaskflowAssist.init({
+      commands: [
+        {
+          label: "Go to Tasks",
+          keywords: ["home", "tasks"],
+          hint: "Navigate",
+          run: () => {
+            window.location.href = "/";
+          },
+        },
+        {
+          label: "Go to Analytics",
+          keywords: ["charts", "dashboard", "stats"],
+          hint: "Navigate",
+          run: () => {
+            window.location.href = "/analytics";
+          },
+        },
+        {
+          label: "Add task (full form)",
+          keywords: ["new", "create", "modal"],
+          run: () => openModal(),
+        },
+        {
+          label: "Focus quick add",
+          keywords: ["input", "type"],
+          run: () => quickAddInput && quickAddInput.focus(),
+        },
+        {
+          label: "Show all tasks",
+          keywords: ["filter"],
+          run: () => {
+            setFilter("all");
+            loadTasks();
+          },
+        },
+        {
+          label: "Filter: To do",
+          keywords: ["filter", "todo"],
+          run: () => {
+            setFilter("todo");
+            loadTasks();
+          },
+        },
+        {
+          label: "Filter: In progress",
+          keywords: ["filter", "wip"],
+          run: () => {
+            setFilter("in-progress");
+            loadTasks();
+          },
+        },
+        {
+          label: "Filter: Done",
+          keywords: ["filter", "complete"],
+          run: () => {
+            setFilter("done");
+            loadTasks();
+          },
+        },
+        {
+          label: "View: List",
+          keywords: ["table"],
+          run: () => {
+            setView("list");
+            syncUrl();
+          },
+        },
+        {
+          label: "View: Board",
+          keywords: ["kanban", "drag"],
+          run: () => {
+            setView("board");
+            syncUrl();
+          },
+        },
+      ],
+    });
+  }
+
   // --- Init ---
 
+  applyUrlToState();
   loadTasks();
 });

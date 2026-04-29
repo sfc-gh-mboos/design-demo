@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
 
   <header class="topbar">
     <div class="topbar-inner">
@@ -14,32 +15,107 @@
         <span class="logo-mark"></span>
         <span class="logo-text">Taskflow</span>
       </div>
-      <nav class="topbar-nav">
+      <nav class="topbar-nav" aria-label="Primary">
         <a href="/" class="nav-link active">Tasks</a>
         <a href="/analytics" class="nav-link">Analytics</a>
       </nav>
+      <button type="button" class="palette-trigger-btn" id="openPaletteBtn" title="Quick actions (⌘K)">
+        <span class="palette-trigger-label">Quick actions</span>
+        <kbd class="palette-kbd">⌘K</kbd>
+      </button>
     </div>
   </header>
 
-  <main class="container">
-    <section class="hero hero--tasks" aria-labelledby="heroTitle">
-      <h1 id="heroTitle">Daily Tasks</h1>
+  <main id="main-content" class="container">
+    <div class="assist-strip" id="assistStrip" role="region" aria-label="Suggestions">
+      <div class="assist-strip-inner">
+        <span class="assist-strip-icon" aria-hidden="true">✦</span>
+        <p class="assist-strip-text" id="assistMessage">Loading suggestions…</p>
+        <div class="assist-strip-actions" id="assistActions"></div>
+      </div>
+    </div>
+
+    <section class="hero hero--home" aria-labelledby="heroTitle">
+      <div class="hero-shell">
+        <div class="hero-backdrop" aria-hidden="true"></div>
+        <div class="hero-card">
+          <div class="hero-visual" aria-hidden="true">
+            <div class="hero-ring-wrap">
+              <svg class="hero-ring-svg" viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="hero-ring-track" cx="60" cy="60" r="52"></circle>
+                <circle id="heroRingArc" class="hero-ring-progress" cx="60" cy="60" r="52"
+                  transform="rotate(-90 60 60)"></circle>
+              </svg>
+              <div class="hero-ring-center">
+                <span class="hero-pct" id="heroPct">0</span><span class="hero-pct-unit">%</span>
+              </div>
+              <span class="hero-ring-caption">done</span>
+            </div>
+          </div>
+          <div class="hero-main">
+            <p class="hero-eyebrow">
+              <span id="heroGreeting">Hello</span>
+              <span class="hero-eyebrow-sep">·</span>
+              <time id="dateLabel" class="date-label"></time>
+            </p>
+            <h1 id="heroTitle">Your tasks at a glance</h1>
+            <p class="hero-subtitle">Tip: press <kbd class="inline-kbd">⌘K</kbd> anytime for navigation and shortcuts.</p>
+            <ul class="hero-stats" aria-label="Task counts">
+              <li class="hero-stat">
+                <span class="hero-stat-value" id="heroStatTodo">0</span>
+                <span class="hero-stat-label">To do</span>
+              </li>
+              <li class="hero-stat">
+                <span class="hero-stat-value" id="heroStatProgress">0</span>
+                <span class="hero-stat-label">In progress</span>
+              </li>
+              <li class="hero-stat">
+                <span class="hero-stat-value" id="heroStatDone">0</span>
+                <span class="hero-stat-label">Done</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </section>
+
+    <form class="quick-add" id="quickAddForm" aria-label="Quick add task">
+      <input
+        id="quickAddInput"
+        class="quick-add-input"
+        type="text"
+        placeholder="Add a task, press Enter…"
+        autocomplete="off"
+        aria-label="Task title"
+      >
+      <select id="quickAddCategory" class="quick-add-select" aria-label="Category">
+        <option value="Planning">Planning</option>
+        <option value="Design">Design</option>
+        <option value="Engineering">Engineering</option>
+        <option value="Operations">Operations</option>
+      </select>
+      <select id="quickAddPriority" class="quick-add-select" aria-label="Priority">
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="low">Low</option>
+      </select>
+      <button type="submit" class="quick-add-submit">Add</button>
+    </form>
 
     <div class="toolbar">
       <div class="toolbar-left">
-        <div class="filters" id="filters">
-          <button class="filter-btn active" data-filter="all">All</button>
-          <button class="filter-btn" data-filter="todo">To Do</button>
-          <button class="filter-btn" data-filter="in-progress">In Progress</button>
-          <button class="filter-btn" data-filter="done">Done</button>
+        <div class="filters" id="filters" role="tablist" aria-label="Filter by status">
+          <button type="button" class="filter-btn active" data-filter="all" role="tab" aria-selected="true">All</button>
+          <button type="button" class="filter-btn" data-filter="todo" role="tab" aria-selected="false">To Do</button>
+          <button type="button" class="filter-btn" data-filter="in-progress" role="tab" aria-selected="false">In Progress</button>
+          <button type="button" class="filter-btn" data-filter="done" role="tab" aria-selected="false">Done</button>
         </div>
       </div>
       <div class="view-toggle" id="viewToggle" role="tablist" aria-label="Task view">
         <button class="view-toggle-btn active" type="button" data-view="list" role="tab" aria-selected="true">List</button>
         <button class="view-toggle-btn" type="button" data-view="board" role="tab" aria-selected="false">Board</button>
       </div>
-      <button class="add-task-btn" id="addTaskBtn" type="button" aria-label="Add task">+ Add Task</button>
+      <button class="add-task-btn" id="addTaskBtn" type="button" aria-label="Add task with full form">+ Details</button>
     </div>
 
     <section class="list-view" id="listView" aria-label="Task list">
@@ -107,6 +183,7 @@
     </div>
   </div>
 
+  <script src="assistant.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

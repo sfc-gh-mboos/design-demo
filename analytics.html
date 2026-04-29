@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
 
   <header class="topbar">
     <div class="topbar-inner">
@@ -15,23 +16,35 @@
         <span class="logo-mark"></span>
         <span class="logo-text">Taskflow</span>
       </div>
-      <nav class="topbar-nav">
+      <nav class="topbar-nav" aria-label="Primary">
         <a href="/" class="nav-link">Tasks</a>
         <a href="/analytics" class="nav-link active">Analytics</a>
       </nav>
+      <button type="button" class="palette-trigger-btn" id="openPaletteBtn" title="Quick actions (⌘K)">
+        <span class="palette-trigger-label">Quick actions</span>
+        <kbd class="palette-kbd">⌘K</kbd>
+      </button>
     </div>
   </header>
 
-  <main class="analytics-container">
+  <main id="main-content" class="analytics-container">
+    <div class="assist-strip assist-strip--analytics" id="assistStrip" role="region" aria-label="Reading guide">
+      <div class="assist-strip-inner">
+        <span class="assist-strip-icon" aria-hidden="true">✦</span>
+        <p class="assist-strip-text" id="assistMessage">Use presets for a fast read; cohort changes the sample dataset only.</p>
+        <div class="assist-strip-actions" id="assistActions"></div>
+      </div>
+    </div>
+
     <section class="hero">
       <h1>Analytics Dashboard</h1>
-      <p class="subtitle">Understand your productivity patterns and make data-driven decisions</p>
+      <p class="subtitle">KPIs at the top; scroll for trends. <kbd class="inline-kbd">⌘K</kbd> opens quick navigation.</p>
     </section>
 
     <div class="cohort-filter-wrapper">
       <div class="filter-row">
         <label for="cohortFilter" class="cohort-filter-label">Filter by Cohort:</label>
-        <select id="cohortFilter" class="cohort-filter">
+        <select id="cohortFilter" class="cohort-filter" aria-describedby="cohortHelp">
           <option value="all">All Users</option>
           <option value="power_users">Power Users</option>
           <option value="new_users">New Users</option>
@@ -39,10 +52,11 @@
           <option value="team_alpha">Team Alpha</option>
           <option value="team_beta">Team Beta</option>
         </select>
+        <span id="cohortHelp" class="field-hint">Demo data; each cohort is a consistent sample.</span>
       </div>
       <div class="filter-row date-filter-row">
         <label class="date-filter-label">Date Range:</label>
-        <div class="date-presets">
+        <div class="date-presets" role="group" aria-label="Date presets">
           <button type="button" class="date-preset-btn active" data-days="7">7d</button>
           <button type="button" class="date-preset-btn" data-days="30">30d</button>
           <button type="button" class="date-preset-btn" data-days="90">90d</button>
@@ -56,7 +70,7 @@
       </div>
     </div>
 
-    <div class="kpi-grid">
+    <div class="kpi-grid" id="kpiGrid">
       <div class="kpi-card">
         <div class="kpi-value" id="kpiCompletionRate">--</div>
         <div class="kpi-label">Completion Rate</div>
@@ -103,6 +117,7 @@
     </div>
   </main>
 
+  <script src="assistant.js"></script>
   <script src="analytics.js"></script>
 </body>
 </html>
