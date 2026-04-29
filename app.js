@@ -6,11 +6,47 @@ document.addEventListener("DOMContentLoaded", () => {
   const boardView = document.getElementById("boardView");
   const dateLabel = document.getElementById("dateLabel");
 
-  dateLabel.textContent = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
+  if (dateLabel) {
+    const now = new Date();
+    dateLabel.dateTime = now.toISOString().slice(0, 10);
+    dateLabel.textContent = now.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  const heroGreeting = document.getElementById("heroGreeting");
+  if (heroGreeting) {
+    const h = new Date().getHours();
+    heroGreeting.textContent =
+      h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  }
+
+  const HERO_RING_C = 2 * Math.PI * 52;
+
+  function updateHero(tasks) {
+    const ring = document.getElementById("heroRingArc");
+    if (!ring) return;
+
+    const todo = tasks.filter((t) => t.status === "todo").length;
+    const inProgress = tasks.filter((t) => t.status === "in-progress").length;
+    const done = tasks.filter((t) => t.status === "done").length;
+    const total = tasks.length;
+    const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+
+    const todoEl = document.getElementById("heroStatTodo");
+    const progEl = document.getElementById("heroStatProgress");
+    const doneEl = document.getElementById("heroStatDone");
+    const pctEl = document.getElementById("heroPct");
+    if (todoEl) todoEl.textContent = String(todo);
+    if (progEl) progEl.textContent = String(inProgress);
+    if (doneEl) doneEl.textContent = String(done);
+    if (pctEl) pctEl.textContent = String(pct);
+
+    const dash = (pct / 100) * HERO_RING_C;
+    ring.style.strokeDasharray = `${dash} ${HERO_RING_C}`;
+  }
 
   // --- API layer ---
 
@@ -106,7 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function render() {
     const visibleTasks = getVisibleTasks();
-    const count = visibleTasks.length;
+    updateHero(visibleTasks);
     if (state.view === "board") {
       listView.classList.add("hidden");
       boardView.classList.remove("hidden");

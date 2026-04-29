@@ -1,11 +1,14 @@
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.db
 .idea/
 .cursor/*
 !.cursor/skills/
+!.cursor/agents/
 *.egg-info/
 dist/
 build/
 .env
+.worktrees/
