@@ -42,27 +42,57 @@ document.addEventListener("DOMContentLoaded", () => {
   let priorityFocusChart = null;
   let productivityScoreChart = null;
   let dailyVolumeChart = null;
-  // Color palette using Cursor brand colors
-  const colors = {
-    accent: "#f54e00",
-    accentSubtle: "rgba(245, 78, 0, 0.12)",
-    accentHover: "#ff5c0d",
-    bg: "#f7f7f4",
-    card: "#f2f1ed",
-    fg: "#26251e",
-    fgSecondary: "rgba(38, 37, 30, 0.6)",
-    categoryColors: [
-      "rgba(245, 78, 0, 0.8)",
-      "rgba(245, 78, 0, 0.6)",
-      "rgba(245, 78, 0, 0.4)",
-      "rgba(245, 78, 0, 0.2)"
-    ],
-    priorityColors: {
-      high: "rgba(245, 78, 0, 0.9)",
-      medium: "rgba(245, 78, 0, 0.6)",
-      low: "rgba(38, 37, 30, 0.4)"
-    }
-  };
+
+  function chartPalette() {
+    const el = document.documentElement;
+    const g = (name) => getComputedStyle(el).getPropertyValue(name).trim();
+    const accent = g("--accent") || "#0d9488";
+    const accentHover = g("--accent-hover") || "#14b8a6";
+    const card = g("--card") || "#e8f0ee";
+    const fg = g("--fg") || "#1a2332";
+    const fgSecondary = g("--fg-secondary") || "rgba(26, 35, 50, 0.58)";
+    const chartGrid = g("--chart-grid") || "rgba(26, 35, 50, 0.09)";
+    return {
+      accent,
+      accentSubtle: hexToRgba(accent, 0.18),
+      accentHover,
+      card,
+      fg,
+      fgSecondary,
+      chartGrid,
+      categoryColors: [
+        hexToRgba(accent, 0.82),
+        hexToRgba(accent, 0.62),
+        hexToRgba(accent, 0.42),
+        hexToRgba(accent, 0.22)
+      ],
+      priorityColors: {
+        high: hexToRgba(accent, 0.88),
+        medium: hexToRgba(accent, 0.55),
+        low: mixFg(fg, 0.38)
+      }
+    };
+  }
+
+  function hexToRgba(hex, alpha) {
+    const h = hex.replace("#", "");
+    if (h.length !== 6) return `rgba(13, 148, 136, ${alpha})`;
+    const r = parseInt(h.slice(0, 2), 16);
+    const gch = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return `rgba(${r}, ${gch}, ${b}, ${alpha})`;
+  }
+
+  function mixFg(fgHex, alpha) {
+    const h = fgHex.replace("#", "");
+    if (h.length !== 6) return `rgba(26, 35, 50, ${alpha})`;
+    const r = parseInt(h.slice(0, 2), 16);
+    const gch = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return `rgba(${r}, ${gch}, ${b}, ${alpha})`;
+  }
+
+  let colors = chartPalette();
   
   // API layer
   const AnalyticsAPI = {
@@ -195,7 +225,7 @@ document.addEventListener("DOMContentLoaded", () => {
               font: { size: 10 }
             },
             grid: {
-              color: "rgba(38, 37, 30, 0.08)"
+              color: colors.chartGrid
             }
           },
           x: {
@@ -276,7 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
               font: { size: 10 }
             },
             grid: {
-              color: "rgba(38, 37, 30, 0.08)"
+              color: colors.chartGrid
             }
           },
           x: {
@@ -370,7 +400,7 @@ document.addEventListener("DOMContentLoaded", () => {
               font: { size: 10 }
             },
             grid: {
-              color: "rgba(38, 37, 30, 0.08)"
+              color: colors.chartGrid
             }
           }
         }
@@ -433,7 +463,7 @@ document.addEventListener("DOMContentLoaded", () => {
               }
             },
             grid: {
-              color: "rgba(38, 37, 30, 0.08)"
+              color: colors.chartGrid
             }
           },
           x: {
@@ -533,7 +563,7 @@ document.addEventListener("DOMContentLoaded", () => {
               stepSize: 1
             },
             grid: {
-              color: "rgba(38, 37, 30, 0.08)"
+              color: colors.chartGrid
             }
           }
         }
@@ -541,8 +571,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function onThemeChange() {
+    colors = chartPalette();
+    refreshAnalytics();
+  }
+
+  window.addEventListener("taskflow-themechange", onThemeChange);
+  window.addEventListener("storage", (e) => {
+    if (e.key === "taskflow-theme") onThemeChange();
+  });
+
   // Load and render all data
   async function loadAnalytics(cohort, startDate, endDate) {
+    colors = chartPalette();
     try {
       const [summary, distribution, trends] = await Promise.all([
         AnalyticsAPI.getSummary(cohort, startDate, endDate),
