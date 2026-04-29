@@ -56,6 +56,9 @@ def row_to_dict(row):
     return {key: row[key] for key in row.keys()}
 
 
+TASK_COLUMNS = "id, title, status, category, priority, created_at, completed_at"
+
+
 def normalize_title(title):
     if not title or not str(title).strip():
         return None
@@ -143,12 +146,18 @@ def index():
 def get_tasks():
     conn = get_db()
     status = request.args.get("status")
+    conditions = []
+    params = []
     if status and status != "all":
+        conditions.append("status = ?")
+        params.append(status)
+    if conditions:
+        where = " AND ".join(conditions)
         rows = conn.execute(
-            "SELECT * FROM tasks WHERE status = ?", (status,)
+            f"SELECT {TASK_COLUMNS} FROM tasks WHERE {where}", params
         ).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM tasks").fetchall()
+        rows = conn.execute(f"SELECT {TASK_COLUMNS} FROM tasks").fetchall()
     conn.close()
     return jsonify([row_to_dict(r) for r in rows])
 
@@ -167,7 +176,9 @@ def create_task():
         (title, category, priority),
     )
     conn.commit()
-    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    row = conn.execute(
+        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (cursor.lastrowid,)
+    ).fetchone()
     conn.close()
     return jsonify(row_to_dict(row)), 201
 
@@ -176,7 +187,9 @@ def create_task():
 def update_task(task_id):
     data = request.get_json(silent=True) or {}
     conn = get_db()
-    existing = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    existing = conn.execute(
+        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)
+    ).fetchone()
     if not existing:
         conn.close()
         return jsonify({"error": "task not found"}), 404
@@ -208,7 +221,7 @@ def update_task(task_id):
         ),
     )
     conn.commit()
-    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    row = conn.execute(f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
     conn.close()
     return jsonify(row_to_dict(row))
 
@@ -216,7 +229,9 @@ def update_task(task_id):
 @app.route("/api/tasks/<int:task_id>", methods=["DELETE"])
 def delete_task(task_id):
     conn = get_db()
-    existing = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    existing = conn.execute(
+        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)
+    ).fetchone()
     if not existing:
         conn.close()
         return jsonify({"error": "task not found"}), 404
@@ -395,7 +410,7 @@ def _generate_analytics_data(cohort, start_date=None, end_date=None):
             "weekly_progress": weekly_progress,
             "priority_focus": priority_focus,
             "productivity_score": productivity_score,
-            "daily_volume": daily_volume
+            "daily_volume": daily_volume,
         }
     }
 
@@ -407,116 +422,6 @@ def _get_analytics_date_params():
     start_date = _parse_date(start_s) if start_s else None
     end_date = _parse_date(end_s) if end_s else None
     return start_date, end_date
-
-
-def _heatmap_summary(conn, today):
-    total_completions = conn.execute(
-        """
-        SELECT COUNT(*) AS total
-        FROM tasks
-        WHERE status = 'done' AND completed_at IS NOT NULL AND completed_at != ''
-        """
-    ).fetchone()["total"]
-    completion_rows = conn.execute(
-        """
-        SELECT date(completed_at) AS completion_day
-        FROM tasks
-        WHERE status = 'done' AND completed_at IS NOT NULL AND completed_at != ''
-        GROUP BY date(completed_at)
-        ORDER BY completion_day ASC
-        """
-    ).fetchall()
-    completion_days = [datetime.strptime(row["completion_day"], "%Y-%m-%d").date() for row in completion_rows]
-    completion_day_set = set(completion_days)
-
-    current_streak = 0
-    probe_day = today
-    while probe_day in completion_day_set:
-        current_streak += 1
-        probe_day -= timedelta(days=1)
-
-    longest_streak = 0
-    running_streak = 0
-    previous_day = None
-    for day in completion_days:
-        if previous_day is None:
-            running_streak = 1
-        elif (day - previous_day).days == 1:
-            running_streak += 1
-        else:
-            running_streak = 1
-        longest_streak = max(longest_streak, running_streak)
-        previous_day = day
-
-    return {
-        "current_streak_days": current_streak,
-        "longest_streak_days": longest_streak,
-        "total_completions": total_completions,
-    }
-
-
-def _build_heatmap_grid(conn, today):
-    current_week_monday = today - timedelta(days=today.weekday())
-    grid_start = current_week_monday - timedelta(weeks=11)
-    grid_end = current_week_monday + timedelta(days=6)
-    daily_counts_rows = conn.execute(
-        """
-        SELECT date(completed_at) AS completion_day, COUNT(*) AS completion_count
-        FROM tasks
-        WHERE status = 'done'
-          AND completed_at IS NOT NULL
-          AND completed_at != ''
-          AND date(completed_at) BETWEEN ? AND ?
-        GROUP BY date(completed_at)
-        """,
-        (grid_start.isoformat(), grid_end.isoformat()),
-    ).fetchall()
-    daily_counts = {row["completion_day"]: row["completion_count"] for row in daily_counts_rows}
-    max_count = max(daily_counts.values(), default=0)
-
-    def level_for_count(count):
-        if count <= 0:
-            return 0
-        if max_count <= 1:
-            return 5
-        ratio = count / max_count
-        if ratio <= 0.2:
-            return 1
-        if ratio <= 0.4:
-            return 2
-        if ratio <= 0.6:
-            return 3
-        if ratio <= 0.8:
-            return 4
-        return 5
-
-    weeks = []
-    month_labels = []
-    for week_index in range(12):
-        week_start = grid_start + timedelta(weeks=week_index)
-        if week_index == 0 or week_start.month != (week_start - timedelta(weeks=1)).month:
-            month_labels.append({"month": week_start.strftime("%b"), "column": week_index})
-        days = []
-        for day_index in range(7):
-            day = week_start + timedelta(days=day_index)
-            day_key = day.isoformat()
-            count = daily_counts.get(day_key, 0)
-            days.append(
-                {
-                    "date": day_key,
-                    "count": count,
-                    "level": level_for_count(count),
-                }
-            )
-        weeks.append({"week_start": week_start.isoformat(), "days": days})
-
-    return {
-        "range_start": grid_start.isoformat(),
-        "range_end": grid_end.isoformat(),
-        "month_labels": month_labels,
-        "weeks": weeks,
-        "max_daily_count": max_count,
-    }
 
 
 @app.route("/api/analytics/summary", methods=["GET"])
@@ -555,36 +460,9 @@ def analytics_trends():
     return jsonify(data["trends"])
 
 
-@app.route("/api/analytics/heatmap", methods=["GET"])
-def analytics_heatmap():
-    conn = get_db()
-    today = datetime.now(timezone.utc).date()
-    heatmap = _build_heatmap_grid(conn, today)
-    summary = _heatmap_summary(conn, today)
-    conn.close()
-    return jsonify(
-        {
-            "summary": summary,
-            "range": {
-                "start": heatmap["range_start"],
-                "end": heatmap["range_end"],
-            },
-            "month_labels": heatmap["month_labels"],
-            "weeks": heatmap["weeks"],
-            "legend_levels": [0, 1, 2, 3, 4, 5],
-            "day_labels": ["Mon", "Wed", "Fri", "Sun"],
-        }
-    )
-
-
 @app.route("/analytics")
 def analytics_page():
     return send_from_directory(".", "analytics.html")
-
-
-@app.route("/heatmap")
-def heatmap_page():
-    return send_from_directory(".", "heatmap.html")
 
 
 if __name__ == "__main__":

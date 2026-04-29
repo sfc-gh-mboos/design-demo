@@ -6,6 +6,7 @@ __pycache__/
 .idea/
 .cursor/*
 !.cursor/skills/
+!.cursor/agents/
 *.egg-info/
 dist/
 build/
