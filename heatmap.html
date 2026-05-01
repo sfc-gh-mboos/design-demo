@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Heatmap - Taskflow</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/heatmap" class="nav-link active">Heatmap</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="heatmap-page">
+    <section class="heatmap-header">
+      <h1>Activity Heatmap</h1>
+    </section>
+
+    <section class="heatmap-stats" aria-label="Heatmap summary stats">
+      <article class="heatmap-stat">
+        <div class="heatmap-stat-label">Current Streak</div>
+        <div class="heatmap-stat-value" id="currentStreak">
+          0
+          <span class="heatmap-stat-unit">days</span>
+        </div>
+      </article>
+      <article class="heatmap-stat">
+        <div class="heatmap-stat-label">Longest Streak</div>
+        <div class="heatmap-stat-value" id="longestStreak">
+          0
+          <span class="heatmap-stat-unit">days</span>
+        </div>
+      </article>
+      <article class="heatmap-stat">
+        <div class="heatmap-stat-label">Total Completions</div>
+        <div class="heatmap-stat-value" id="totalCompletions">0</div>
+      </article>
+    </section>
+
+    <section class="heatmap-card" aria-label="Task completion intensity grid">
+      <div class="heatmap-grid-shell">
+        <div class="heatmap-month-labels" id="heatmapMonthLabels"></div>
+        <div class="heatmap-grid-row">
+          <div class="heatmap-day-labels" id="heatmapDayLabels"></div>
+          <div class="heatmap-grid" id="heatmapGrid"></div>
+        </div>
+      </div>
+      <div class="heatmap-legend" aria-label="Heatmap legend">
+        <span>Less</span>
+        <div class="heatmap-legend-cells" id="heatmapLegendCells"></div>
+        <span>More</span>
+      </div>
+    </section>
+    <div class="heatmap-tooltip" id="heatmapTooltip" role="status" aria-live="polite"></div>
+  </main>
+
+  <script src="heatmap.js"></script>
+</body>
+</html>
