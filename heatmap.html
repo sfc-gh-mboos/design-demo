@@ -22,47 +22,53 @@
   </header>
 
   <main class="heatmap-page">
-    <section class="heatmap-header">
-      <h1>Activity Heatmap</h1>
+    <section class="heatmap-header" aria-labelledby="heatmapTitle">
+      <h1 id="heatmapTitle">Activity Heatmap</h1>
+      <div class="heatmap-stats">
+        <article class="heatmap-stat">
+          <p class="heatmap-stat-label">Current Streak</p>
+          <p class="heatmap-stat-value">
+            <span id="currentStreakValue">0</span>
+            <span class="heatmap-stat-unit">days</span>
+          </p>
+        </article>
+        <article class="heatmap-stat">
+          <p class="heatmap-stat-label">Longest Streak</p>
+          <p class="heatmap-stat-value">
+            <span id="longestStreakValue">0</span>
+            <span class="heatmap-stat-unit">days</span>
+          </p>
+        </article>
+        <article class="heatmap-stat">
+          <p class="heatmap-stat-label">Total Completions</p>
+          <p class="heatmap-stat-value" id="totalCompletionsValue">0</p>
+        </article>
+      </div>
     </section>
 
-    <section class="heatmap-stats" aria-label="Heatmap summary stats">
-      <article class="heatmap-stat">
-        <div class="heatmap-stat-label">Current Streak</div>
-        <div class="heatmap-stat-value" id="currentStreak">
-          0
-          <span class="heatmap-stat-unit">days</span>
-        </div>
-      </article>
-      <article class="heatmap-stat">
-        <div class="heatmap-stat-label">Longest Streak</div>
-        <div class="heatmap-stat-value" id="longestStreak">
-          0
-          <span class="heatmap-stat-unit">days</span>
-        </div>
-      </article>
-      <article class="heatmap-stat">
-        <div class="heatmap-stat-label">Total Completions</div>
-        <div class="heatmap-stat-value" id="totalCompletions">0</div>
-      </article>
-    </section>
-
-    <section class="heatmap-card" aria-label="Task completion intensity grid">
+    <section class="heatmap-card" aria-labelledby="heatmapGridTitle">
+      <h2 id="heatmapGridTitle" class="sr-only">Task completion heatmap</h2>
       <div class="heatmap-grid-shell">
-        <div class="heatmap-month-labels" id="heatmapMonthLabels"></div>
+        <div class="heatmap-month-labels" id="monthLabels"></div>
         <div class="heatmap-grid-row">
-          <div class="heatmap-day-labels" id="heatmapDayLabels"></div>
-          <div class="heatmap-grid" id="heatmapGrid"></div>
+          <div class="heatmap-day-labels" aria-hidden="true">
+            <span>Mon</span>
+            <span>Wed</span>
+            <span>Fri</span>
+            <span>Sun</span>
+          </div>
+          <div class="heatmap-grid" id="heatmapGrid" role="grid" aria-label="Last 12 weeks of task completions"></div>
         </div>
       </div>
-      <div class="heatmap-legend" aria-label="Heatmap legend">
+      <div class="heatmap-legend" aria-hidden="true">
         <span>Less</span>
-        <div class="heatmap-legend-cells" id="heatmapLegendCells"></div>
+        <div class="heatmap-legend-cells" id="legendCells"></div>
         <span>More</span>
       </div>
     </section>
-    <div class="heatmap-tooltip" id="heatmapTooltip" role="status" aria-live="polite"></div>
   </main>
+
+  <div class="heatmap-tooltip" id="heatmapTooltip" role="status" aria-live="polite"></div>
 
   <script src="heatmap.js"></script>
 </body>

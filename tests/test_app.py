@@ -13,18 +13,24 @@ def test_heatmap_page_returns_200(client):
     assert resp.status_code == 200
 
 
-def test_heatmap_api_contract(client):
+def test_heatmap_api_returns_expected_shape(client):
     resp = client.get("/api/analytics/heatmap")
     assert resp.status_code == 200
 
     payload = resp.get_json()
-    assert isinstance(payload, dict)
     assert "summary" in payload
-    assert "range" in payload
     assert "month_labels" in payload
     assert "weeks" in payload
     assert "legend_levels" in payload
     assert "day_labels" in payload
 
-    assert len(payload["weeks"]) == 12
-    assert all(len(week["days"]) == 7 for week in payload["weeks"])
+    summary = payload["summary"]
+    assert "current_streak_days" in summary
+    assert "longest_streak_days" in summary
+    assert "total_completions" in summary
+
+    weeks = payload["weeks"]
+    assert len(weeks) == 12
+    for week in weeks:
+        assert "days" in week
+        assert len(week["days"]) == 7
