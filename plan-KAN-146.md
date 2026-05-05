@@ -1,48 +1,59 @@
 # Implementation Plan: KAN-146 Add activity heatmap
 
 ## Scope
-- In scope: new `Heatmap` page linked from top navigation, pixel-accurate rendering of provided Figma node, tooltip interactions, and API-backed summary/grid data from task completion timestamps.
-- In scope: `GET /api/analytics/heatmap` verification and tests for page and endpoint.
-- Out of scope: changes to existing analytics chart behavior, data warehouse integrations, or unrelated in-progress files.
+In scope:
+- Add a dedicated Activity Heatmap page at `/heatmap` and wire top navigation alongside Tasks and Analytics.
+- Render a GitHub-style 12-week completion heatmap from `GET /api/analytics/heatmap`.
+- Match the provided Figma mock with pixel-focused layout and spacing.
+- Add test coverage for the new page route and heatmap API response contract.
+
+Out of scope:
+- Changes to analytics dashboard chart behavior.
+- Database schema changes beyond existing `completed_at` support.
 
 ## Design Reference
-- Figma: https://www.figma.com/design/oTsNM9L38fv9uDNLwK0K9l/Task--Management--Web-App-Design--Community-?node-id=3457-32&m=dev
-- Intent: clean white card, 12-week matrix with 7 rows (Mon-Sun), subtle labels, accent-based intensity ramp, summary metrics above grid, and compact "Less/More" legend.
+Figma: https://www.figma.com/design/oTsNM9L38fv9uDNLwK0K9l/Task--Management--Web-App-Design--Community-?node-id=3457-32&m=dev
+
+Design intent:
+- Clean page shell with top nav and wide card container.
+- Header title + three summary stats above a 12-column x 7-row grid.
+- Accent-driven intensity scale from empty (white/card) to full accent.
+- Month labels on top axis, selective day labels on y-axis, compact legend.
 
 ## Approach
-- Reuse existing backend heatmap aggregation helpers in `server.py` and keep the API contract stable.
-- Recreate `heatmap.html` and `heatmap.js` to render the heatmap from API response (`weeks`, `month_labels`, `summary`) with precise DOM structure for styling parity.
-- Keep styling in `styles.css` heatmap section aligned with Figma dimensions (cell size, spacing, padding, label typography, border radii).
-- Ensure top nav includes Heatmap on both existing pages and the heatmap page marks itself active.
+- Reuse existing backend endpoint `GET /api/analytics/heatmap` and existing heatmap CSS block, then tune styles for Figma parity.
+- Reintroduce dedicated `heatmap.html` and `heatmap.js` to keep concerns isolated from `analytics.html`.
+- Render month labels and cells from API payload rather than hardcoding data.
+- Implement lightweight tooltip behavior in vanilla JS with keyboard/focus support.
 
 ## File Changes
-- `server.py` - add `/heatmap` page route (if missing), keep `/api/analytics/heatmap` contract consistent.
+- `server.py` - add `/heatmap` page route.
 - `index.html` - add Heatmap nav link.
 - `analytics.html` - add Heatmap nav link.
-- `heatmap.html` - add full heatmap page markup.
-- `heatmap.js` - fetch and render summary, month labels, 7x12 grid, legend, and tooltip.
-- `styles.css` - tune heatmap styles for pixel fit.
-- `tests/test_app.py` - add `/heatmap` and `/api/analytics/heatmap` assertions.
+- `heatmap.html` - new dedicated page markup.
+- `heatmap.js` - new fetch/render/tooltip logic.
+- `styles.css` - tune heatmap layout/spacing/typography for pixel fidelity.
+- `tests/test_app.py` - add route and API contract coverage.
 
 ## Steps
-1. Recreate missing page/script files for heatmap rendering.
-2. Update navigation and backend route linkage for `/heatmap`.
-3. Tune layout/styling to mirror Figma spacing and intensity scale.
-4. Add tests for page availability and API response shape.
-5. Run lint/pytest verification and fix any regressions.
+1. Add `/heatmap` route and nav links across existing pages.
+2. Create heatmap page HTML shell and placeholder containers.
+3. Implement JS rendering from `/api/analytics/heatmap`.
+4. Adjust CSS for Figma parity (container, labels, grid, legend, tooltip).
+5. Add tests for `/heatmap` and API shape.
+6. Run tests and lint diagnostics, then prepare commit and PR.
 
 ## Edge Cases
-- No completed tasks in range should still render full grid with empty cells and valid labels.
-- Timezone boundaries should not break streak calculations or date labels.
-- Tooltip content should handle singular/plural task wording.
+- No completions in period (all level-0 cells, summary zeros).
+- Sparse month boundaries inside 12-week range.
+- Invalid or missing API fields (display graceful empty state).
+- Tooltip positioning near viewport edges.
 
 ## Test Plan
-- [ ] `GET /heatmap` returns HTTP 200
-- [ ] `GET /api/analytics/heatmap` returns HTTP 200 with expected keys
-- [ ] Heatmap API returns `weeks` with 12 columns and 7 rows per week
-- [ ] Manual check: nav includes Heatmap and active state is correct
-- [ ] Manual check: visual parity against provided Figma screenshot
+- [ ] Unit-like endpoint test for `GET /api/analytics/heatmap` structure.
+- [ ] Page route test for `GET /heatmap`.
+- [ ] Existing page route tests continue to pass.
 
 ## Risks
-- Existing in-progress branch changes could overlap; mitigate by committing only KAN-146-specific files.
-- Pixel-perfect differences across font rendering may vary slightly by platform; mitigate with exact spacing and token values.
+- Pixel-perfect tuning may conflict with responsive behavior; mitigate with breakpoint-specific styles.
+- Existing in-progress branch edits may overlap; mitigate by editing only targeted files and preserving unrelated logic.

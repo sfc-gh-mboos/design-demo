@@ -1146,6 +1146,13 @@ body {
   max-width: 1120px;
   margin: 0 auto;
   padding: 32px 50px 80px;
+  font-family: "Inter", "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.heatmap-body .topbar-inner {
+  max-width: 1120px;
+  padding-left: 50px;
+  padding-right: 50px;
 }
 
 .heatmap-header h1 {
@@ -1197,6 +1204,7 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 10px;
   padding: 25px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
 }
 
 .heatmap-grid-shell {
@@ -1322,7 +1330,6 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 6px;
-  border: 1px solid transparent;
 }
 
 .heatmap-tooltip {
@@ -1350,6 +1357,11 @@ body {
     padding-top: 20px;
   }
 
+  .heatmap-body .topbar-inner {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
   .heatmap-header h1 {
     font-size: 1.7rem;
   }
@@ -1371,6 +1383,11 @@ body {
 
 @media (max-width: 520px) {
   .heatmap-page {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .heatmap-body .topbar-inner {
     padding-left: 16px;
     padding-right: 16px;
   }
