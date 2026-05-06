@@ -6,7 +6,7 @@
   <title>Activity Heatmap - Taskflow</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="heatmap-body">
+<body>
   <header class="topbar">
     <div class="topbar-inner">
       <div class="logo">
@@ -22,38 +22,38 @@
   </header>
 
   <main class="heatmap-page">
-    <section class="heatmap-header">
-      <h1>Activity Heatmap</h1>
+    <section class="heatmap-header" aria-labelledby="heatmapTitle">
+      <h1 id="heatmapTitle">Activity Heatmap</h1>
       <div class="heatmap-stats">
-        <div class="heatmap-stat">
+        <article class="heatmap-stat">
           <p class="heatmap-stat-label">Current Streak</p>
           <p class="heatmap-stat-value">
-            <span id="currentStreakValue">0</span>
+            <span id="currentStreakDays">0</span>
             <span class="heatmap-stat-unit">days</span>
           </p>
-        </div>
-        <div class="heatmap-stat">
+        </article>
+        <article class="heatmap-stat">
           <p class="heatmap-stat-label">Longest Streak</p>
           <p class="heatmap-stat-value">
-            <span id="longestStreakValue">0</span>
+            <span id="longestStreakDays">0</span>
             <span class="heatmap-stat-unit">days</span>
           </p>
-        </div>
-        <div class="heatmap-stat">
+        </article>
+        <article class="heatmap-stat">
           <p class="heatmap-stat-label">Total Completions</p>
           <p class="heatmap-stat-value">
-            <span id="totalCompletionsValue">0</span>
+            <span id="totalCompletions">0</span>
           </p>
-        </div>
+        </article>
       </div>
     </section>
 
-    <section class="heatmap-card" aria-labelledby="heatmapTitle">
-      <h2 id="heatmapTitle" class="sr-only">Last 12 weeks completion heatmap</h2>
+    <section class="heatmap-card" aria-label="Task completions heatmap">
       <div class="heatmap-grid-shell">
-        <div class="heatmap-month-labels" id="heatmapMonthLabels"></div>
+        <div class="heatmap-month-labels" id="heatmapMonthLabels" aria-hidden="true"></div>
+
         <div class="heatmap-grid-row">
-          <div class="heatmap-day-labels">
+          <div class="heatmap-day-labels" aria-hidden="true">
             <span>Mon</span>
             <span>Wed</span>
             <span>Fri</span>
@@ -62,7 +62,8 @@
           <div class="heatmap-grid" id="heatmapGrid"></div>
         </div>
       </div>
-      <div class="heatmap-legend" aria-label="Heatmap intensity legend">
+
+      <div class="heatmap-legend" aria-hidden="true">
         <span>Less</span>
         <div class="heatmap-legend-cells">
           <span class="heatmap-legend-cell heatmap-level-0"></span>
@@ -78,7 +79,6 @@
   </main>
 
   <div class="heatmap-tooltip" id="heatmapTooltip" role="tooltip" aria-hidden="true"></div>
-
   <script src="heatmap.js"></script>
 </body>
 </html>
