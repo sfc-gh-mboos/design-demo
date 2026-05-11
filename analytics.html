@@ -18,17 +18,18 @@
       <nav class="topbar-nav">
         <a href="/" class="nav-link">Tasks</a>
         <a href="/analytics" class="nav-link active">Analytics</a>
+        <a href="/heatmap" class="nav-link">Heatmap</a>
       </nav>
     </div>
   </header>
 
-  <main class="analytics-container">
-    <section class="hero">
-      <h1>Analytics Dashboard</h1>
+  <main class="analytics-container" aria-label="Analytics dashboard">
+    <section class="hero" aria-labelledby="analyticsDashboardHeading">
+      <h1 id="analyticsDashboardHeading">Analytics Dashboard</h1>
       <p class="subtitle">Understand your productivity patterns and make data-driven decisions</p>
     </section>
 
-    <div class="cohort-filter-wrapper">
+    <section class="cohort-filter-wrapper" aria-label="Dashboard filters">
       <div class="filter-row">
         <label for="cohortFilter" class="cohort-filter-label">Filter by Cohort:</label>
         <select id="cohortFilter" class="cohort-filter">
@@ -41,7 +42,7 @@
         </select>
       </div>
       <div class="filter-row date-filter-row">
-        <label class="date-filter-label">Date Range:</label>
+        <label class="date-filter-label" for="startDate">Date Range:</label>
         <div class="date-presets">
           <button type="button" class="date-preset-btn active" data-days="7">7d</button>
           <button type="button" class="date-preset-btn" data-days="30">30d</button>
@@ -54,9 +55,9 @@
           <input type="date" id="endDate" class="date-input" aria-label="End date">
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="kpi-grid">
+    <section class="kpi-grid" aria-label="Key performance indicators">
       <div class="kpi-card">
         <div class="kpi-value" id="kpiCompletionRate">--</div>
         <div class="kpi-label">Completion Rate</div>
@@ -73,34 +74,34 @@
         <div class="kpi-value" id="kpiHighPriority">--</div>
         <div class="kpi-label">High-Priority Completion</div>
       </div>
-    </div>
+    </section>
 
-    <div class="charts-grid">
-      <div class="chart-card">
+    <section class="charts-grid" aria-label="Analytics charts">
+      <article class="chart-card">
         <h3 class="chart-title">Task Distribution by Category</h3>
         <canvas id="categoryChart"></canvas>
-      </div>
-      <div class="chart-card">
+      </article>
+      <article class="chart-card">
         <h3 class="chart-title">Task Distribution by Priority</h3>
         <canvas id="priorityChart"></canvas>
-      </div>
-      <div class="chart-card">
+      </article>
+      <article class="chart-card">
         <h3 class="chart-title">Weekly Progress</h3>
         <canvas id="weeklyProgressChart"></canvas>
-      </div>
-      <div class="chart-card">
+      </article>
+      <article class="chart-card">
         <h3 class="chart-title">Priority Focus Over Time</h3>
         <canvas id="priorityFocusChart"></canvas>
-      </div>
-      <div class="chart-card chart-card-full">
+      </article>
+      <article class="chart-card chart-card-full">
         <h3 class="chart-title">Daily Task Volume</h3>
         <canvas id="dailyVolumeChart"></canvas>
-      </div>
-      <div class="chart-card chart-card-full">
+      </article>
+      <article class="chart-card chart-card-full">
         <h3 class="chart-title">Productivity Score Trend</h3>
         <canvas id="productivityScoreChart"></canvas>
-      </div>
-    </div>
+      </article>
+    </section>
   </main>
 
   <script src="analytics.js"></script>
