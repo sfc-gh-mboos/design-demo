@@ -66,32 +66,21 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // API layer
   const AnalyticsAPI = {
-    _params(cohort, start, end) {
-      let url = `cohort=${encodeURIComponent(cohort)}`;
-      if (start) url += `&start_date=${encodeURIComponent(start)}`;
-      if (end) url += `&end_date=${encodeURIComponent(end)}`;
-      return url;
+    _query(cohort, start, end) {
+      return ApiClient.buildQuery({
+        cohort,
+        start_date: start,
+        end_date: end,
+      });
     },
     async getSummary(cohort, start, end) {
-      const res = await fetch(`/api/analytics/summary?${this._params(cohort, start, end)}`);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch summary: ${res.statusText}`);
-      }
-      return res.json();
+      return ApiClient.requestJson(`/api/analytics/summary${this._query(cohort, start, end)}`);
     },
     async getDistribution(cohort, start, end) {
-      const res = await fetch(`/api/analytics/distribution?${this._params(cohort, start, end)}`);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch distribution: ${res.statusText}`);
-      }
-      return res.json();
+      return ApiClient.requestJson(`/api/analytics/distribution${this._query(cohort, start, end)}`);
     },
     async getTrends(cohort, start, end) {
-      const res = await fetch(`/api/analytics/trends?${this._params(cohort, start, end)}`);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch trends: ${res.statusText}`);
-      }
-      return res.json();
+      return ApiClient.requestJson(`/api/analytics/trends${this._query(cohort, start, end)}`);
     }
   };
   

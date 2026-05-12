@@ -52,45 +52,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const TaskAPI = {
     async getAll(status) {
-      const query = status && status !== "all" ? `?status=${status}` : "";
-      const res = await fetch(`/api/tasks${query}`);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch tasks: ${res.statusText}`);
-      }
-      return res.json();
+      const query = ApiClient.buildQuery({ status: status !== "all" ? status : undefined });
+      return ApiClient.requestJson(`/api/tasks${query}`);
     },
 
     async update(id, data) {
-      const res = await fetch(`/api/tasks/${id}`, {
+      return ApiClient.requestJson(`/api/tasks/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        data,
       });
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(error.error || `Failed to update task: ${res.statusText}`);
-      }
-      return res.json();
     },
 
     async create(data) {
-      const res = await fetch("/api/tasks", {
+      return ApiClient.requestJson("/api/tasks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        data,
       });
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(error.error || `Failed to create task: ${res.statusText}`);
-      }
-      return res.json();
     },
 
     async remove(id) {
-      const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        throw new Error(`Failed to delete task: ${res.statusText}`);
-      }
+      return ApiClient.requestJson(`/api/tasks/${id}`, { method: "DELETE" });
     },
   };
 

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "taskflow.db")
+VALID_COHORTS = {"all", "power_users", "new_users", "enterprise", "team_alpha", "team_beta"}
 
 
 def get_db():
@@ -56,9 +57,6 @@ def row_to_dict(row):
     return {key: row[key] for key in row.keys()}
 
 
-TASK_COLUMNS = "id, title, status, category, priority, created_at, completed_at"
-
-
 def normalize_title(title):
     if not title or not str(title).strip():
         return None
@@ -70,6 +68,23 @@ def normalize_priority(priority):
     if priority and str(priority).strip().lower() in valid:
         return str(priority).strip().lower()
     return None
+
+
+def get_request_json():
+    return request.get_json(silent=True) or {}
+
+
+def error_response(message, status_code):
+    return jsonify({"error": message}), status_code
+
+
+def parse_cohort():
+    cohort = request.args.get("cohort", "all")
+    return cohort if cohort in VALID_COHORTS else "all"
+
+
+def get_task_or_none(conn, task_id):
+    return conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
 
 
 def generate_demo_data(conn):
@@ -146,28 +161,22 @@ def index():
 def get_tasks():
     conn = get_db()
     status = request.args.get("status")
-    conditions = []
-    params = []
     if status and status != "all":
-        conditions.append("status = ?")
-        params.append(status)
-    if conditions:
-        where = " AND ".join(conditions)
         rows = conn.execute(
-            f"SELECT {TASK_COLUMNS} FROM tasks WHERE {where}", params
+            "SELECT * FROM tasks WHERE status = ?", (status,)
         ).fetchall()
     else:
-        rows = conn.execute(f"SELECT {TASK_COLUMNS} FROM tasks").fetchall()
+        rows = conn.execute("SELECT * FROM tasks").fetchall()
     conn.close()
     return jsonify([row_to_dict(r) for r in rows])
 
 
 @app.route("/api/tasks", methods=["POST"])
 def create_task():
-    data = request.get_json(silent=True) or {}
+    data = get_request_json()
     title = normalize_title(data.get("title"))
     if not title:
-        return jsonify({"error": "title is required"}), 400
+        return error_response("title is required", 400)
     category = data.get("category", "Planning").strip() or "Planning"
     priority = normalize_priority(data.get("priority")) or "medium"
     conn = get_db()
@@ -176,35 +185,31 @@ def create_task():
         (title, category, priority),
     )
     conn.commit()
-    row = conn.execute(
-        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (cursor.lastrowid,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone()
     conn.close()
     return jsonify(row_to_dict(row)), 201
 
 
 @app.route("/api/tasks/<int:task_id>", methods=["PUT"])
 def update_task(task_id):
-    data = request.get_json(silent=True) or {}
+    data = get_request_json()
     conn = get_db()
-    existing = conn.execute(
-        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)
-    ).fetchone()
+    existing = get_task_or_none(conn, task_id)
     if not existing:
         conn.close()
-        return jsonify({"error": "task not found"}), 404
+        return error_response("task not found", 404)
     if "title" in data:
         new_title = normalize_title(data.get("title"))
         if not new_title:
             conn.close()
-            return jsonify({"error": "title is required"}), 400
+            return error_response("title is required", 400)
     else:
         new_title = existing["title"]
     if "priority" in data:
         new_priority = normalize_priority(data.get("priority"))
         if not new_priority:
             conn.close()
-            return jsonify({"error": "priority must be one of: high, medium, low"}), 400
+            return error_response("priority must be one of: high, medium, low", 400)
     else:
         new_priority = existing["priority"]
     new_status = data.get("status", existing["status"])
@@ -221,7 +226,7 @@ def update_task(task_id):
         ),
     )
     conn.commit()
-    row = conn.execute(f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     conn.close()
     return jsonify(row_to_dict(row))
 
@@ -229,12 +234,10 @@ def update_task(task_id):
 @app.route("/api/tasks/<int:task_id>", methods=["DELETE"])
 def delete_task(task_id):
     conn = get_db()
-    existing = conn.execute(
-        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)
-    ).fetchone()
+    existing = get_task_or_none(conn, task_id)
     if not existing:
         conn.close()
-        return jsonify({"error": "task not found"}), 404
+        return error_response("task not found", 404)
     conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     conn.commit()
     conn.close()
@@ -410,7 +413,7 @@ def _generate_analytics_data(cohort, start_date=None, end_date=None):
             "weekly_progress": weekly_progress,
             "priority_focus": priority_focus,
             "productivity_score": productivity_score,
-            "daily_volume": daily_volume,
+            "daily_volume": daily_volume
         }
     }
 
@@ -424,40 +427,26 @@ def _get_analytics_date_params():
     return start_date, end_date
 
 
+def _analytics_response(section):
+    cohort = parse_cohort()
+    start_date, end_date = _get_analytics_date_params()
+    data = _generate_analytics_data(cohort, start_date, end_date)
+    return jsonify(data[section])
+
+
 @app.route("/api/analytics/summary", methods=["GET"])
 def analytics_summary():
-    cohort = request.args.get("cohort", "all")
-    valid_cohorts = ["all", "power_users", "new_users", "enterprise", "team_alpha", "team_beta"]
-    if cohort not in valid_cohorts:
-        cohort = "all"
-    start_date, end_date = _get_analytics_date_params()
-
-    data = _generate_analytics_data(cohort, start_date, end_date)
-    return jsonify(data["summary"])
+    return _analytics_response("summary")
 
 
 @app.route("/api/analytics/distribution", methods=["GET"])
 def analytics_distribution():
-    cohort = request.args.get("cohort", "all")
-    valid_cohorts = ["all", "power_users", "new_users", "enterprise", "team_alpha", "team_beta"]
-    if cohort not in valid_cohorts:
-        cohort = "all"
-    start_date, end_date = _get_analytics_date_params()
-
-    data = _generate_analytics_data(cohort, start_date, end_date)
-    return jsonify(data["distribution"])
+    return _analytics_response("distribution")
 
 
 @app.route("/api/analytics/trends", methods=["GET"])
 def analytics_trends():
-    cohort = request.args.get("cohort", "all")
-    valid_cohorts = ["all", "power_users", "new_users", "enterprise", "team_alpha", "team_beta"]
-    if cohort not in valid_cohorts:
-        cohort = "all"
-    start_date, end_date = _get_analytics_date_params()
-
-    data = _generate_analytics_data(cohort, start_date, end_date)
-    return jsonify(data["trends"])
+    return _analytics_response("trends")
 
 
 @app.route("/analytics")
