@@ -42,6 +42,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let priorityFocusChart = null;
   let productivityScoreChart = null;
   let dailyVolumeChart = null;
+  let deliveryTimelineChart = null;
+  let deliveryBurndownChart = null;
   // Color palette using Cursor brand colors
   const colors = {
     accent: "#f54e00",
@@ -66,10 +68,18 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // API layer
   const AnalyticsAPI = {
-    _params(cohort, start, end) {
+    _params(cohort, start, end, forecastOpts) {
       let url = `cohort=${encodeURIComponent(cohort)}`;
       if (start) url += `&start_date=${encodeURIComponent(start)}`;
       if (end) url += `&end_date=${encodeURIComponent(end)}`;
+      if (forecastOpts) {
+        if (forecastOpts.velocity_window_days != null && forecastOpts.velocity_window_days !== "") {
+          url += `&velocity_window_days=${encodeURIComponent(forecastOpts.velocity_window_days)}`;
+        }
+        if (forecastOpts.max_forecast_days != null && forecastOpts.max_forecast_days !== "") {
+          url += `&max_forecast_days=${encodeURIComponent(forecastOpts.max_forecast_days)}`;
+        }
+      }
       return url;
     },
     async getSummary(cohort, start, end) {
@@ -86,8 +96,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       return res.json();
     },
-    async getTrends(cohort, start, end) {
-      const res = await fetch(`/api/analytics/trends?${this._params(cohort, start, end)}`);
+    async getTrends(cohort, start, end, forecastOpts) {
+      const res = await fetch(`/api/analytics/trends?${this._params(cohort, start, end, forecastOpts)}`);
       if (!res.ok) {
         throw new Error(`Failed to fetch trends: ${res.statusText}`);
       }
@@ -541,15 +551,411 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function getForecastOptsFromDom() {
+    const vwEl = document.getElementById("forecastVelocityWindow");
+    const mdEl = document.getElementById("forecastMaxDays");
+    return {
+      velocity_window_days: vwEl ? vwEl.value : "7",
+      max_forecast_days: mdEl ? mdEl.value : "120",
+    };
+  }
+
+  function formatChartDay(isoDate) {
+    const d = new Date(`${isoDate}T12:00:00`);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  }
+
+  function formatEtaMedium(isoDate) {
+    if (!isoDate) return null;
+    const d = new Date(`${isoDate}T12:00:00`);
+    return d.toLocaleDateString(undefined, { dateStyle: "medium" });
+  }
+
+  function updateForecastMeta(dt) {
+    const metaEl = document.getElementById("forecastPanelMeta");
+    const subtitleEl = document.getElementById("forecastPanelSubtitle");
+    if (!metaEl || !subtitleEl) return;
+
+    const vb = dt.velocity_basis || {};
+    const wdays = vb.window_days != null ? vb.window_days : 7;
+    const avg = vb.avg_completed_per_day != null ? vb.avg_completed_per_day : 0;
+    subtitleEl.textContent = `Based on trailing ${wdays}-day avg: ${avg} completions/day`;
+
+    const history = dt.history || [];
+    const forecast = dt.forecast || [];
+
+    if (history.length === 0) {
+      metaEl.textContent = "No daily trend data in this date range.";
+      return;
+    }
+
+    const lastHist = history[history.length - 1];
+    const horizon = getForecastOptsFromDom().max_forecast_days;
+
+    let lines = [];
+
+    if (lastHist.backlog_remaining <= 0) {
+      lines.push(`Backlog clear as of ${formatEtaMedium(lastHist.date) || lastHist.date}.`);
+    } else if (dt.estimated_delivery_date) {
+      lines.push(`Est. backlog cleared: ${formatEtaMedium(dt.estimated_delivery_date) || dt.estimated_delivery_date}.`);
+    } else if ((vb.avg_completed_per_day === 0 || vb.avg_completed_per_day == null) && forecast.length === 0) {
+      lines.push("Forecast unavailable — no trailing completions to estimate velocity.");
+    }
+
+    if (dt.forecast_truncated && forecast.length > 0) {
+      const remaining = forecast[forecast.length - 1].projected_backlog_remaining;
+      lines.push(`Beyond ${horizon}-day horizon (~${remaining} tasks remaining).`);
+    }
+
+    metaEl.textContent = lines.filter(Boolean).join(" ");
+  }
+
+  function updateForecastKpis(dt) {
+    const kVel = document.getElementById("forecastKpiVelocity");
+    const kEta = document.getElementById("forecastKpiEta");
+    const kRem = document.getElementById("forecastKpiRemaining");
+    if (!kVel || !kEta || !kRem) return;
+
+    const vb = dt.velocity_basis || {};
+    const history = dt.history || [];
+
+    kVel.textContent = vb.avg_completed_per_day != null ? String(vb.avg_completed_per_day) : "—";
+
+    if (history.length === 0) {
+      kEta.textContent = "—";
+      kRem.textContent = "—";
+      return;
+    }
+
+    const lastHist = history[history.length - 1];
+    kRem.textContent = String(lastHist.backlog_remaining);
+
+    if (lastHist.backlog_remaining <= 0) {
+      kEta.textContent = formatEtaMedium(lastHist.date) || lastHist.date;
+    } else if (dt.estimated_delivery_date) {
+      kEta.textContent = formatEtaMedium(dt.estimated_delivery_date) || dt.estimated_delivery_date;
+    } else {
+      kEta.textContent = "—";
+    }
+  }
+
+  function renderDeliveryTimelineChart(dt) {
+    const canvas = document.getElementById("deliveryTimelineChart");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    if (deliveryTimelineChart) {
+      deliveryTimelineChart.destroy();
+    }
+
+    const history = dt.history || [];
+    const forecast = dt.forecast || [];
+
+    if (history.length === 0) {
+      deliveryTimelineChart = new Chart(ctx, {
+        type: "line",
+        data: { labels: [], datasets: [] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: { legend: { display: false } },
+        },
+      });
+      return;
+    }
+
+    const labels = [
+      ...history.map((row) => formatChartDay(row.date)),
+      ...forecast.map((row) => formatChartDay(row.date)),
+    ];
+
+    const completedActual = history.map((r) => r.completed).concat(forecast.map(() => null));
+    const backlogActual = history.map((r) => r.backlog_remaining).concat(forecast.map(() => null));
+    const completedProj = history.map(() => null).concat(forecast.map((r) => r.projected_completed));
+    const backlogProj = history.map(() => null).concat(forecast.map((r) => r.projected_backlog_remaining));
+
+    deliveryTimelineChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Completed (actual)",
+            data: completedActual,
+            borderColor: colors.accent,
+            backgroundColor: "transparent",
+            yAxisID: "y",
+            tension: 0.25,
+            spanGaps: false,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          },
+          {
+            label: "Completed (projected)",
+            data: completedProj,
+            borderColor: colors.accentHover,
+            backgroundColor: "transparent",
+            borderDash: [6, 4],
+            yAxisID: "y",
+            tension: 0.25,
+            spanGaps: false,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          },
+          {
+            label: "Backlog (actual)",
+            data: backlogActual,
+            borderColor: colors.priorityColors.low,
+            backgroundColor: "transparent",
+            yAxisID: "y1",
+            tension: 0.25,
+            spanGaps: false,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          },
+          {
+            label: "Backlog (projected)",
+            data: backlogProj,
+            borderColor: "rgba(38, 37, 30, 0.55)",
+            backgroundColor: "transparent",
+            borderDash: [6, 4],
+            yAxisID: "y1",
+            tension: 0.25,
+            spanGaps: false,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              font: { size: 11 },
+              color: colors.fg,
+              padding: 12,
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                const v = context.parsed.y;
+                if (v == null || Number.isNaN(v)) return null;
+                const rounded = Math.round(v * 100) / 100;
+                return `${context.dataset.label}: ${rounded}`;
+              },
+              filter(item) {
+                const v = item.parsed.y;
+                return v != null && !Number.isNaN(v);
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: colors.fgSecondary,
+              font: { size: 10 },
+              maxRotation: 45,
+              minRotation: 0,
+            },
+            grid: { display: false },
+          },
+          y: {
+            position: "left",
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: "Completions / day",
+              color: colors.fgSecondary,
+              font: { size: 11 },
+            },
+            ticks: {
+              color: colors.fgSecondary,
+              font: { size: 10 },
+            },
+            grid: {
+              color: "rgba(38, 37, 30, 0.08)",
+            },
+          },
+          y1: {
+            position: "right",
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: "Backlog remaining",
+              color: colors.fgSecondary,
+              font: { size: 11 },
+            },
+            ticks: {
+              color: colors.fgSecondary,
+              font: { size: 10 },
+            },
+            grid: {
+              drawOnChartArea: false,
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function renderDeliveryBurndownChart(dt) {
+    const canvas = document.getElementById("deliveryBurndownChart");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    if (deliveryBurndownChart) {
+      deliveryBurndownChart.destroy();
+    }
+
+    const history = dt.history || [];
+    const forecast = dt.forecast || [];
+
+    if (history.length === 0) {
+      deliveryBurndownChart = new Chart(ctx, {
+        type: "line",
+        data: { labels: [], datasets: [] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: { legend: { display: false } },
+        },
+      });
+      return;
+    }
+
+    const labels = [
+      ...history.map((row) => formatChartDay(row.date)),
+      ...forecast.map((row) => formatChartDay(row.date)),
+    ];
+
+    const backlogActual = history.map((r) => r.backlog_remaining).concat(forecast.map(() => null));
+    const backlogProj = history.map(() => null).concat(forecast.map((r) => r.projected_backlog_remaining));
+
+    deliveryBurndownChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Backlog (actual)",
+            data: backlogActual,
+            borderColor: colors.accent,
+            backgroundColor: colors.accentSubtle,
+            fill: false,
+            tension: 0.25,
+            spanGaps: false,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          },
+          {
+            label: "Backlog (projected)",
+            data: backlogProj,
+            borderColor: colors.accentHover,
+            backgroundColor: "transparent",
+            borderDash: [6, 4],
+            tension: 0.25,
+            spanGaps: false,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              font: { size: 11 },
+              color: colors.fg,
+              padding: 12,
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                const v = context.parsed.y;
+                if (v == null || Number.isNaN(v)) return null;
+                return `${context.dataset.label}: ${v}`;
+              },
+              filter(item) {
+                const v = item.parsed.y;
+                return v != null && !Number.isNaN(v);
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: colors.fgSecondary,
+              font: { size: 10 },
+              maxRotation: 45,
+              minRotation: 0,
+            },
+            grid: { display: false },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: {
+              color: colors.fgSecondary,
+              font: { size: 10 },
+            },
+            grid: {
+              color: "rgba(38, 37, 30, 0.08)",
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function renderForecastPanel(dt) {
+    const safe = dt || {};
+    updateForecastMeta(safe);
+    updateForecastKpis(safe);
+    renderDeliveryTimelineChart(safe);
+    renderDeliveryBurndownChart(safe);
+  }
+
+  async function reloadForecastTrendsOnly() {
+    try {
+      const { start, end } = getDateParams();
+      const trends = await AnalyticsAPI.getTrends(
+        cohortFilter.value,
+        start || undefined,
+        end || undefined,
+        getForecastOptsFromDom(),
+      );
+      renderForecastPanel(trends.delivery_timeline || {});
+    } catch (error) {
+      console.error("Failed to refresh forecast:", error);
+      const errorDiv = document.createElement("div");
+      errorDiv.className = "error-feedback";
+      errorDiv.textContent = "Failed to refresh delivery forecast.";
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 5000);
+    }
+  }
+
   // Load and render all data
   async function loadAnalytics(cohort, startDate, endDate) {
     try {
+      const forecastOpts = getForecastOptsFromDom();
       const [summary, distribution, trends] = await Promise.all([
         AnalyticsAPI.getSummary(cohort, startDate, endDate),
         AnalyticsAPI.getDistribution(cohort, startDate, endDate),
-        AnalyticsAPI.getTrends(cohort, startDate, endDate)
+        AnalyticsAPI.getTrends(cohort, startDate, endDate, forecastOpts),
       ]);
-      
+
       updateKPIs(summary);
       renderCategoryChart(distribution);
       renderPriorityChart(distribution);
@@ -557,6 +963,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderPriorityFocusChart(trends);
       renderDailyVolumeChart(trends);
       renderProductivityScoreChart(trends);
+      renderForecastPanel(trends.delivery_timeline || {});
     } catch (error) {
       console.error("Failed to load analytics:", error);
       // Show error feedback
@@ -599,4 +1006,9 @@ document.addEventListener("DOMContentLoaded", () => {
     setPresetActive("");
     refreshAnalytics();
   });
+
+  const forecastApplyBtn = document.getElementById("forecastApplyBtn");
+  if (forecastApplyBtn) {
+    forecastApplyBtn.addEventListener("click", () => reloadForecastTrendsOnly());
+  }
 });

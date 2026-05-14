@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 import sqlite3
 import os
+import math
 import random
 from datetime import datetime, timedelta, timezone
 
@@ -54,9 +55,6 @@ def init_db():
 
 def row_to_dict(row):
     return {key: row[key] for key in row.keys()}
-
-
-TASK_COLUMNS = "id, title, status, category, priority, created_at, completed_at"
 
 
 def normalize_title(title):
@@ -146,18 +144,12 @@ def index():
 def get_tasks():
     conn = get_db()
     status = request.args.get("status")
-    conditions = []
-    params = []
     if status and status != "all":
-        conditions.append("status = ?")
-        params.append(status)
-    if conditions:
-        where = " AND ".join(conditions)
         rows = conn.execute(
-            f"SELECT {TASK_COLUMNS} FROM tasks WHERE {where}", params
+            "SELECT * FROM tasks WHERE status = ?", (status,)
         ).fetchall()
     else:
-        rows = conn.execute(f"SELECT {TASK_COLUMNS} FROM tasks").fetchall()
+        rows = conn.execute("SELECT * FROM tasks").fetchall()
     conn.close()
     return jsonify([row_to_dict(r) for r in rows])
 
@@ -176,9 +168,7 @@ def create_task():
         (title, category, priority),
     )
     conn.commit()
-    row = conn.execute(
-        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (cursor.lastrowid,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone()
     conn.close()
     return jsonify(row_to_dict(row)), 201
 
@@ -187,9 +177,7 @@ def create_task():
 def update_task(task_id):
     data = request.get_json(silent=True) or {}
     conn = get_db()
-    existing = conn.execute(
-        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)
-    ).fetchone()
+    existing = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     if not existing:
         conn.close()
         return jsonify({"error": "task not found"}), 404
@@ -221,7 +209,7 @@ def update_task(task_id):
         ),
     )
     conn.commit()
-    row = conn.execute(f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     conn.close()
     return jsonify(row_to_dict(row))
 
@@ -229,9 +217,7 @@ def update_task(task_id):
 @app.route("/api/tasks/<int:task_id>", methods=["DELETE"])
 def delete_task(task_id):
     conn = get_db()
-    existing = conn.execute(
-        f"SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)
-    ).fetchone()
+    existing = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     if not existing:
         conn.close()
         return jsonify({"error": "task not found"}), 404
@@ -254,7 +240,114 @@ def _parse_date(s):
         return None
 
 
-def _generate_analytics_data(cohort, start_date=None, end_date=None):
+def _parse_bounded_int_arg(name, default, min_val, max_val):
+    """Parse optional integer query param; clamp to [min_val, max_val]; invalid uses default."""
+    raw = request.args.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        v = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(min_val, min(max_val, v))
+
+
+def _build_delivery_timeline(daily_volume, velocity_window_days=7, max_forecast_days=120):
+    """
+    Canonical delivery forecast from daily cohort demo series (see delivery-forecasting skill).
+    History grain: calendar day; completed = daily done count; backlog = todo + in_progress.
+    """
+    velocity_window_days = max(1, int(velocity_window_days))
+    max_forecast_days = max(1, int(max_forecast_days))
+
+    empty_basis = {"window_days": velocity_window_days, "avg_completed_per_day": 0.0}
+    if not daily_volume:
+        return {
+            "history": [],
+            "forecast": [],
+            "estimated_delivery_date": None,
+            "forecast_truncated": False,
+            "velocity_basis": empty_basis,
+        }
+
+    history = []
+    for row in daily_volume:
+        history.append({
+            "date": row["date"],
+            "completed": max(0, int(row["done"])),
+            "backlog_remaining": max(0, int(row["todo"])) + max(0, int(row["in_progress"])),
+        })
+
+    window = min(velocity_window_days, len(history))
+    if window == 0:
+        velocity = 0.0
+    else:
+        tail = history[-window:]
+        velocity = sum(h["completed"] for h in tail) / float(window)
+
+    avg_completed_per_day = round(velocity, 2)
+    velocity_basis = {"window_days": velocity_window_days, "avg_completed_per_day": avg_completed_per_day}
+
+    last = history[-1]
+    last_backlog = last["backlog_remaining"]
+    last_date = datetime.strptime(last["date"], "%Y-%m-%d").date()
+
+    epsilon = 1e-9
+
+    if last_backlog <= 0:
+        return {
+            "history": history,
+            "forecast": [],
+            "estimated_delivery_date": last["date"],
+            "forecast_truncated": False,
+            "velocity_basis": velocity_basis,
+        }
+
+    if velocity <= 0:
+        return {
+            "history": history,
+            "forecast": [],
+            "estimated_delivery_date": None,
+            "forecast_truncated": False,
+            "velocity_basis": velocity_basis,
+        }
+
+    cur_date = last_date
+    cur_backlog = float(last_backlog)
+    forecast = []
+    estimated_delivery_date = None
+
+    while len(forecast) < max_forecast_days:
+        cur_date = cur_date + timedelta(days=1)
+        completed_today = min(velocity, cur_backlog)
+        cur_backlog -= completed_today
+        forecast.append({
+            "date": cur_date.isoformat(),
+            "projected_completed": round(completed_today, 2),
+            "projected_backlog_remaining": int(max(0, math.floor(cur_backlog))),
+        })
+        if cur_backlog < epsilon:
+            estimated_delivery_date = cur_date.isoformat()
+            break
+
+    forecast_truncated = estimated_delivery_date is None and cur_backlog > epsilon
+
+    return {
+        "history": history,
+        "forecast": forecast,
+        "estimated_delivery_date": estimated_delivery_date,
+        "forecast_truncated": forecast_truncated,
+        "velocity_basis": velocity_basis,
+    }
+
+
+def _generate_analytics_data(
+    cohort,
+    start_date=None,
+    end_date=None,
+    velocity_window_days=7,
+    max_forecast_days=120,
+):
     """
     Generate deterministic dummy analytics data for a given cohort.
     Uses hash-based seeding so each cohort gets consistent but distinct data.
@@ -384,6 +477,12 @@ def _generate_analytics_data(cohort, start_date=None, end_date=None):
     productivity_score.reverse()
     daily_volume.sort(key=lambda d: d["date"])
 
+    delivery_timeline = _build_delivery_timeline(
+        daily_volume,
+        velocity_window_days=velocity_window_days,
+        max_forecast_days=max_forecast_days,
+    )
+
     # Recompute summary KPIs from filtered data
     total_created = sum(w["created"] for w in weekly_progress)
     total_completed = sum(w["completed"] for w in weekly_progress)
@@ -391,7 +490,6 @@ def _generate_analytics_data(cohort, start_date=None, end_date=None):
     tasks_this_week = total_completed if weekly_progress else base_tasks_week
     high_priority_completion = round(min(95, base_completion * 100 + 10), 1)
     avg_days_to_complete = round(2.5 + (cohort_hash % 10) / 5, 1)
-    weekly_velocity = round(tasks_this_week * base_completion) if tasks_this_week else 0
 
     return {
         "summary": {
@@ -400,7 +498,6 @@ def _generate_analytics_data(cohort, start_date=None, end_date=None):
             "streak_days": base_streak,
             "high_priority_completion": high_priority_completion,
             "avg_days_to_complete": avg_days_to_complete,
-            "weekly_velocity": weekly_velocity
         },
         "distribution": {
             "by_category": by_category,
@@ -411,6 +508,7 @@ def _generate_analytics_data(cohort, start_date=None, end_date=None):
             "priority_focus": priority_focus,
             "productivity_score": productivity_score,
             "daily_volume": daily_volume,
+            "delivery_timeline": delivery_timeline,
         }
     }
 
@@ -455,8 +553,16 @@ def analytics_trends():
     if cohort not in valid_cohorts:
         cohort = "all"
     start_date, end_date = _get_analytics_date_params()
+    velocity_window_days = _parse_bounded_int_arg("velocity_window_days", default=7, min_val=1, max_val=90)
+    max_forecast_days = _parse_bounded_int_arg("max_forecast_days", default=120, min_val=1, max_val=365)
 
-    data = _generate_analytics_data(cohort, start_date, end_date)
+    data = _generate_analytics_data(
+        cohort,
+        start_date,
+        end_date,
+        velocity_window_days=velocity_window_days,
+        max_forecast_days=max_forecast_days,
+    )
     return jsonify(data["trends"])
 
 
