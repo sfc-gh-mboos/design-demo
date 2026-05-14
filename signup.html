@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign up · Taskflow</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav" id="topbarNav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/metrics" class="nav-link">My Metrics</a>
+      </nav>
+      <div class="auth-status" id="authStatus" data-state="anonymous">
+        <a href="/login" class="auth-link">Log in</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="auth-container">
+    <section class="auth-card" aria-labelledby="authTitle">
+      <h1 id="authTitle" class="auth-title">Create your profile</h1>
+      <p class="auth-subtitle">Sign up to track your own tasks and view personalized metrics.</p>
+
+      <form id="signupForm" class="auth-form" novalidate>
+        <label class="form-label" for="signupUsername">Username</label>
+        <input
+          id="signupUsername"
+          class="form-input"
+          name="username"
+          type="text"
+          autocomplete="username"
+          placeholder="alex.doe"
+          required
+          minlength="3"
+          maxlength="32"
+          pattern="[a-zA-Z0-9_.\-]{3,32}"
+        >
+        <p class="form-hint">3-32 chars: letters, numbers, '.', '_', '-'.</p>
+
+        <label class="form-label" for="signupDisplayName">Display name</label>
+        <input
+          id="signupDisplayName"
+          class="form-input"
+          name="display_name"
+          type="text"
+          autocomplete="name"
+          placeholder="Alex Doe"
+          maxlength="64"
+        >
+        <p class="form-hint">Optional. Defaults to your username.</p>
+
+        <label class="form-label" for="signupPassword">Password</label>
+        <input
+          id="signupPassword"
+          class="form-input"
+          name="password"
+          type="password"
+          autocomplete="new-password"
+          minlength="6"
+          required
+        >
+        <p class="form-hint">At least 6 characters.</p>
+
+        <button type="submit" class="form-submit auth-submit">Create profile</button>
+        <p class="auth-error" id="authError" role="alert" hidden></p>
+      </form>
+
+      <p class="auth-switch">
+        Already have a profile? <a href="/login">Log in</a>
+      </p>
+    </section>
+  </main>
+
+  <script src="auth-status.js"></script>
+  <script src="signup.js"></script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Metrics · Taskflow</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav" id="topbarNav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/metrics" class="nav-link active">My Metrics</a>
+      </nav>
+      <div class="auth-status" id="authStatus" data-state="anonymous">
+        <a href="/login" class="auth-link">Log in</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="metrics-container">
+    <section class="hero hero--metrics" aria-labelledby="metricsTitle">
+      <h1 id="metricsTitle">My Metrics</h1>
+      <p class="subtitle" id="metricsSubtitle">Custom metrics from the tasks you have created.</p>
+    </section>
+
+    <section class="metrics-gate" id="metricsGate" hidden>
+      <div class="metrics-gate-card">
+        <h2 class="metrics-gate-title">Log in to view your metrics</h2>
+        <p class="metrics-gate-text">
+          My Metrics shows productivity stats computed from the tasks you have created.
+          Sign up or log in to start tracking yours.
+        </p>
+        <div class="metrics-gate-actions">
+          <a href="/signup" class="form-submit auth-submit">Create a profile</a>
+          <a href="/login" class="auth-link auth-link--button">Log in</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="metrics-content" id="metricsContent" hidden>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiTotalTasks">--</div>
+          <div class="kpi-label">My Total Tasks</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiCompletionRate">--</div>
+          <div class="kpi-label">Completion Rate</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiStreakDays">--</div>
+          <div class="kpi-label">Streak (Days)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiCompletedWeek">--</div>
+          <div class="kpi-label">Completed (7d)</div>
+        </div>
+      </div>
+
+      <div class="metrics-grid">
+        <article class="metrics-card">
+          <h3 class="metrics-card-title">By Status</h3>
+          <ul class="metrics-bars" id="statusBars"></ul>
+        </article>
+
+        <article class="metrics-card">
+          <h3 class="metrics-card-title">By Priority</h3>
+          <ul class="metrics-bars" id="priorityBars"></ul>
+        </article>
+
+        <article class="metrics-card metrics-card--full">
+          <h3 class="metrics-card-title">By Category</h3>
+          <ul class="metrics-bars" id="categoryBars"></ul>
+        </article>
+
+        <article class="metrics-card metrics-card--full">
+          <h3 class="metrics-card-title">Daily Volume (Last 14 Days)</h3>
+          <div class="daily-volume" id="dailyVolume" aria-label="Daily task volume"></div>
+        </article>
+      </div>
+
+      <p class="metrics-empty" id="metricsEmpty" hidden>
+        You have no tasks yet. Head to <a href="/">Tasks</a> and add some to populate your metrics.
+      </p>
+    </section>
+  </main>
+
+  <script src="auth-status.js"></script>
+  <script src="metrics.js"></script>
+</body>
+</html>
