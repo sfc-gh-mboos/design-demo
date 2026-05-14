@@ -4,7 +4,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const taskList = document.getElementById("taskList");
   const listView = document.getElementById("listView");
   const boardView = document.getElementById("boardView");
+  const topbarNav = document.getElementById("topbarNav");
   const dateLabel = document.getElementById("dateLabel");
+  const authPanel = document.getElementById("authPanel");
+  const appShell = document.getElementById("appShell");
+  const profileActions = document.getElementById("profileActions");
+  const profileName = document.getElementById("profileName");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const authForm = document.getElementById("authForm");
+  const authNameField = document.getElementById("authNameField");
+  const authNameInput = document.getElementById("authNameInput");
+  const authEmailInput = document.getElementById("authEmailInput");
+  const authPasswordInput = document.getElementById("authPasswordInput");
+  const authError = document.getElementById("authError");
+  const authSubmitBtn = document.getElementById("authSubmitBtn");
+  const authModeBtns = document.querySelectorAll("[data-auth-mode]");
 
   if (dateLabel) {
     const now = new Date();
@@ -49,6 +63,59 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- API layer ---
+
+  const AuthAPI = {
+    async getProfile() {
+      const res = await fetch("/api/profile");
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(error.error || `Failed to fetch profile: ${res.statusText}`);
+      }
+      return res.json();
+    },
+
+    async getStats() {
+      const res = await fetch("/api/profile/stats");
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(error.error || `Failed to fetch stats: ${res.statusText}`);
+      }
+      return res.json();
+    },
+
+    async signup(data) {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(error.error || `Failed to sign up: ${res.statusText}`);
+      }
+      return res.json();
+    },
+
+    async login(data) {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(error.error || `Failed to log in: ${res.statusText}`);
+      }
+      return res.json();
+    },
+
+    async logout() {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (!res.ok) {
+        throw new Error(`Failed to log out: ${res.statusText}`);
+      }
+    },
+  };
 
   const TaskAPI = {
     async getAll(status) {
@@ -101,17 +168,67 @@ document.addEventListener("DOMContentLoaded", () => {
     tasks: [],
     filter: "all",
     view: "list",
+    authMode: "signup",
+    user: null,
   };
 
   async function loadTasks() {
     state.tasks = await TaskAPI.getAll(state.filter);
     render();
+    await loadStats();
+  }
+
+  async function loadStats() {
+    const stats = await AuthAPI.getStats();
+    updateStats(stats);
   }
 
   // --- UI rendering ---
 
   const PRIORITY_LABELS = { high: "High", medium: "Med", low: "Low" };
   const BOARD_STATUSES = ["todo", "in-progress", "done"];
+
+  function updateStats(stats) {
+    document.getElementById("statTotal").textContent = stats.total_tasks;
+    document.getElementById("statCompletion").textContent = `${stats.completion_rate}%`;
+    document.getElementById("statDone").textContent = stats.completed_tasks;
+    document.getElementById("statHighPriority").textContent = stats.high_priority_tasks;
+  }
+
+  function setAuthMode(mode) {
+    state.authMode = mode;
+    authModeBtns.forEach((button) => {
+      const isActive = button.dataset.authMode === mode;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    authNameField.classList.toggle("hidden", mode === "login");
+    authNameInput.required = mode === "signup";
+    authPasswordInput.autocomplete = mode === "signup" ? "new-password" : "current-password";
+    authSubmitBtn.textContent = mode === "signup" ? "Create profile" : "Log in";
+    authError.textContent = "";
+  }
+
+  function showSignedOut() {
+    state.user = null;
+    state.tasks = [];
+    authPanel.classList.remove("hidden");
+    appShell.classList.add("hidden");
+    topbarNav.classList.add("hidden");
+    profileActions.classList.add("hidden");
+    profileName.textContent = "";
+    render();
+  }
+
+  async function showSignedIn(user) {
+    state.user = user;
+    profileName.textContent = user.name;
+    topbarNav.classList.remove("hidden");
+    profileActions.classList.remove("hidden");
+    authPanel.classList.add("hidden");
+    appShell.classList.remove("hidden");
+    await loadTasks();
+  }
 
   function renderTask(task) {
     const li = document.createElement("li");
@@ -120,23 +237,40 @@ document.addEventListener("DOMContentLoaded", () => {
     li.dataset.category = task.category.toLowerCase();
     li.dataset.id = task.id;
 
-    li.innerHTML = `
-      <div class="status-indicator status-${task.status}"></div>
-      <div class="task-body">
-        <span class="task-title">${task.title}</span>
-        <span class="task-meta">${task.category}</span>
-      </div>
-      <span class="priority priority-${task.priority}">${PRIORITY_LABELS[task.priority] || task.priority}</span>
-    `;
-
-    const statusDot = li.querySelector(".status-indicator");
-    statusDot.style.cursor = "pointer";
+    const statusDot = document.createElement("button");
+    statusDot.type = "button";
+    statusDot.className = `status-indicator status-${task.status}`;
     statusDot.title = "Cycle status";
+    statusDot.setAttribute("aria-label", `Move ${task.title} to ${STATUS_CYCLE[task.status]}`);
     statusDot.addEventListener("click", (e) => {
       e.stopPropagation();
       cycleStatus(task);
     });
 
+    const body = document.createElement("div");
+    body.className = "task-body";
+    const title = document.createElement("span");
+    title.className = "task-title";
+    title.textContent = task.title;
+    const meta = document.createElement("span");
+    meta.className = "task-meta";
+    meta.textContent = task.category;
+    body.append(title, meta);
+
+    const priority = document.createElement("span");
+    priority.className = `priority priority-${task.priority}`;
+    priority.textContent = PRIORITY_LABELS[task.priority] || task.priority;
+
+    const statusButton = document.createElement("button");
+    statusButton.type = "button";
+    statusButton.className = "status-action";
+    statusButton.textContent = STATUS_ACTION_LABELS[task.status] || "Update";
+    statusButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      cycleStatus(task);
+    });
+
+    li.append(statusDot, body, priority, statusButton);
     return li;
   }
 
@@ -165,14 +299,21 @@ document.addEventListener("DOMContentLoaded", () => {
     
     const priorityLabel = PRIORITY_LABELS[task.priority] || task.priority;
     const isDone = task.status === "done";
-    
-    item.innerHTML = `
-      <div class="board-task-header">
-        <span class="board-task-title ${isDone ? 'done' : ''}">${task.title}</span>
-        <span class="board-task-priority priority-${task.priority}">${priorityLabel}</span>
-      </div>
-      <span class="board-task-meta">${task.category}</span>
-    `;
+
+    const header = document.createElement("div");
+    header.className = "board-task-header";
+    const title = document.createElement("span");
+    title.className = `board-task-title ${isDone ? "done" : ""}`.trim();
+    title.textContent = task.title;
+    const priority = document.createElement("span");
+    priority.className = `board-task-priority priority-${task.priority}`;
+    priority.textContent = priorityLabel;
+    header.append(title, priority);
+
+    const meta = document.createElement("span");
+    meta.className = "board-task-meta";
+    meta.textContent = task.category;
+    item.append(header, meta);
     
     // Add drag event listeners
     item.addEventListener("dragstart", handleDragStart);
@@ -233,11 +374,21 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Actions ---
 
   const STATUS_CYCLE = { todo: "in-progress", "in-progress": "done", done: "todo" };
+  const STATUS_ACTION_LABELS = { todo: "Start", "in-progress": "Mark done", done: "Reopen" };
 
   async function cycleStatus(task) {
+    const previousStatus = task.status;
     const nextStatus = STATUS_CYCLE[task.status];
-    await TaskAPI.update(task.id, { status: nextStatus });
-    await loadTasks();
+    task.status = nextStatus;
+    render();
+    try {
+      await TaskAPI.update(task.id, { status: nextStatus });
+      await loadTasks();
+    } catch (error) {
+      task.status = previousStatus;
+      await loadTasks();
+      showErrorFeedback(error.message || "Failed to update task status.");
+    }
   }
 
   // --- Drag and Drop (KN-5) ---
@@ -379,7 +530,49 @@ document.addEventListener("DOMContentLoaded", () => {
     render();
   }
 
+  async function bootstrapAuth() {
+    setAuthMode("signup");
+    try {
+      const profile = await AuthAPI.getProfile();
+      await showSignedIn(profile.user);
+    } catch (error) {
+      showSignedOut();
+    }
+  }
+
   // --- Event listeners ---
+
+  authModeBtns.forEach((button) => {
+    button.addEventListener("click", () => setAuthMode(button.dataset.authMode));
+  });
+
+  authForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    authError.textContent = "";
+    const email = authEmailInput.value.trim();
+    const password = authPasswordInput.value;
+    const name = authNameInput.value.trim();
+
+    try {
+      const result =
+        state.authMode === "signup"
+          ? await AuthAPI.signup({ name, email, password })
+          : await AuthAPI.login({ email, password });
+      authForm.reset();
+      await showSignedIn(result.user);
+    } catch (error) {
+      authError.textContent = error.message || "Authentication failed.";
+    }
+  });
+
+  logoutBtn.addEventListener("click", async () => {
+    try {
+      await AuthAPI.logout();
+      showSignedOut();
+    } catch (error) {
+      showErrorFeedback(error.message || "Failed to log out.");
+    }
+  });
 
   filters.addEventListener("click", (e) => {
     if (!e.target.matches(".filter-btn")) return;
@@ -442,5 +635,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Init ---
 
-  loadTasks();
+  bootstrapAuth();
 });

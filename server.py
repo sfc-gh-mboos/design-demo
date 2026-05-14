@@ -1,10 +1,16 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session
 import sqlite3
 import os
 import random
 from datetime import datetime, timedelta, timezone
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__, static_folder=".", static_url_path="")
+app.secret_key = os.environ.get("TASKFLOW_SECRET_KEY") or os.urandom(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "taskflow.db")
 
 
@@ -15,13 +21,15 @@ def get_db():
 
 
 def migrate_add_columns(conn):
-    """Add created_at and completed_at if they don't exist."""
+    """Add task columns if they don't exist."""
     cursor = conn.execute("PRAGMA table_info(tasks)")
     cols = [row[1] for row in cursor.fetchall()]
     if "created_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP")
     if "completed_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT")
+    if "user_id" not in cols:
+        conn.execute("ALTER TABLE tasks ADD COLUMN user_id INTEGER")
     # Backfill existing rows
     conn.execute(
         "UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL OR created_at = ''"
@@ -34,14 +42,25 @@ def migrate_add_columns(conn):
 def init_db():
     conn = get_db()
     conn.execute(
+        """CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
+    conn.execute(
         """CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
             title TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'todo',
             category TEXT NOT NULL DEFAULT 'Planning',
             priority TEXT NOT NULL DEFAULT 'medium',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            completed_at TEXT
+            completed_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )"""
     )
     migrate_add_columns(conn)
@@ -56,6 +75,20 @@ def row_to_dict(row):
     return {key: row[key] for key in row.keys()}
 
 
+def user_to_dict(row):
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "email": row["email"],
+    }
+
+
+def task_to_dict(row):
+    task = row_to_dict(row)
+    task.pop("user_id", None)
+    return task
+
+
 def normalize_title(title):
     if not title or not str(title).strip():
         return None
@@ -67,6 +100,38 @@ def normalize_priority(priority):
     if priority and str(priority).strip().lower() in valid:
         return str(priority).strip().lower()
     return None
+
+
+def normalize_status(status):
+    valid = {"todo", "in-progress", "done"}
+    if status and str(status).strip().lower() in valid:
+        return str(status).strip().lower()
+    return None
+
+
+def normalize_email(email):
+    if not email or not str(email).strip():
+        return None
+    return str(email).strip().lower()
+
+
+def normalize_name(name):
+    if not name or not str(name).strip():
+        return None
+    return str(name).strip()
+
+
+def get_current_user(conn):
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    return conn.execute(
+        "SELECT id, name, email FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+
+
+def auth_error():
+    return jsonify({"error": "login required"}), 401
 
 
 def generate_demo_data(conn):
@@ -139,18 +204,129 @@ def index():
 
 # --- API ---
 
+@app.route("/api/auth/signup", methods=["POST"])
+def signup():
+    data = request.get_json(silent=True) or {}
+    name = normalize_name(data.get("name"))
+    email = normalize_email(data.get("email"))
+    password = data.get("password")
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    if not email:
+        return jsonify({"error": "email is required"}), 400
+    if not password or len(str(password)) < 8:
+        return jsonify({"error": "password must be at least 8 characters"}), 400
+
+    conn = get_db()
+    try:
+        cursor = conn.execute(
+            "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+            (name, email, generate_password_hash(str(password))),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({"error": "email already exists"}), 409
+
+    user = conn.execute(
+        "SELECT id, name, email FROM users WHERE id = ?", (cursor.lastrowid,)
+    ).fetchone()
+    session["user_id"] = user["id"]
+    conn.close()
+    return jsonify({"user": user_to_dict(user)}), 201
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def login():
+    data = request.get_json(silent=True) or {}
+    email = normalize_email(data.get("email"))
+    password = data.get("password")
+    if not email or not password:
+        return jsonify({"error": "email and password are required"}), 400
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if not user or not check_password_hash(user["password_hash"], str(password)):
+        conn.close()
+        return jsonify({"error": "invalid email or password"}), 401
+
+    session["user_id"] = user["id"]
+    conn.close()
+    return jsonify({"user": user_to_dict(user)})
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def logout():
+    session.pop("user_id", None)
+    return "", 204
+
+
+@app.route("/api/profile", methods=["GET"])
+def profile():
+    conn = get_db()
+    user = get_current_user(conn)
+    conn.close()
+    if not user:
+        return auth_error()
+    return jsonify({"user": user_to_dict(user)})
+
+
+@app.route("/api/profile/stats", methods=["GET"])
+def profile_stats():
+    conn = get_db()
+    user = get_current_user(conn)
+    if not user:
+        conn.close()
+        return auth_error()
+
+    row = conn.execute(
+        """
+        SELECT
+          COUNT(*) AS total_tasks,
+          SUM(CASE WHEN status = 'todo' THEN 1 ELSE 0 END) AS todo_tasks,
+          SUM(CASE WHEN status = 'in-progress' THEN 1 ELSE 0 END) AS in_progress_tasks,
+          SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS completed_tasks,
+          SUM(CASE WHEN priority = 'high' THEN 1 ELSE 0 END) AS high_priority_tasks
+        FROM tasks
+        WHERE user_id = ?
+        """,
+        (user["id"],),
+    ).fetchone()
+    conn.close()
+
+    total_tasks = row["total_tasks"] or 0
+    completed_tasks = row["completed_tasks"] or 0
+    completion_rate = round((completed_tasks / total_tasks) * 100, 1) if total_tasks else 0
+    return jsonify(
+        {
+            "total_tasks": total_tasks,
+            "todo_tasks": row["todo_tasks"] or 0,
+            "in_progress_tasks": row["in_progress_tasks"] or 0,
+            "completed_tasks": completed_tasks,
+            "completion_rate": completion_rate,
+            "high_priority_tasks": row["high_priority_tasks"] or 0,
+        }
+    )
+
 @app.route("/api/tasks", methods=["GET"])
 def get_tasks():
     conn = get_db()
+    user = get_current_user(conn)
+    if not user:
+        conn.close()
+        return auth_error()
     status = request.args.get("status")
     if status and status != "all":
         rows = conn.execute(
-            "SELECT * FROM tasks WHERE status = ?", (status,)
+            "SELECT * FROM tasks WHERE user_id = ? AND status = ?",
+            (user["id"], status),
         ).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM tasks").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM tasks WHERE user_id = ?", (user["id"],)
+        ).fetchall()
     conn.close()
-    return jsonify([row_to_dict(r) for r in rows])
+    return jsonify([task_to_dict(r) for r in rows])
 
 
 @app.route("/api/tasks", methods=["POST"])
@@ -162,21 +338,31 @@ def create_task():
     category = data.get("category", "Planning").strip() or "Planning"
     priority = normalize_priority(data.get("priority")) or "medium"
     conn = get_db()
+    user = get_current_user(conn)
+    if not user:
+        conn.close()
+        return auth_error()
     cursor = conn.execute(
-        "INSERT INTO tasks (title, status, category, priority) VALUES (?, 'todo', ?, ?)",
-        (title, category, priority),
+        "INSERT INTO tasks (user_id, title, status, category, priority) VALUES (?, ?, 'todo', ?, ?)",
+        (user["id"], title, category, priority),
     )
     conn.commit()
     row = conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone()
     conn.close()
-    return jsonify(row_to_dict(row)), 201
+    return jsonify(task_to_dict(row)), 201
 
 
 @app.route("/api/tasks/<int:task_id>", methods=["PUT"])
 def update_task(task_id):
     data = request.get_json(silent=True) or {}
     conn = get_db()
-    existing = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    user = get_current_user(conn)
+    if not user:
+        conn.close()
+        return auth_error()
+    existing = conn.execute(
+        "SELECT * FROM tasks WHERE id = ? AND user_id = ?", (task_id, user["id"])
+    ).fetchone()
     if not existing:
         conn.close()
         return jsonify({"error": "task not found"}), 404
@@ -194,7 +380,13 @@ def update_task(task_id):
             return jsonify({"error": "priority must be one of: high, medium, low"}), 400
     else:
         new_priority = existing["priority"]
-    new_status = data.get("status", existing["status"])
+    if "status" in data:
+        new_status = normalize_status(data.get("status"))
+        if not new_status:
+            conn.close()
+            return jsonify({"error": "status must be one of: todo, in-progress, done"}), 400
+    else:
+        new_status = existing["status"]
     completed_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if new_status == "done" else None
     conn.execute(
         "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=? WHERE id=?",
@@ -210,13 +402,19 @@ def update_task(task_id):
     conn.commit()
     row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     conn.close()
-    return jsonify(row_to_dict(row))
+    return jsonify(task_to_dict(row))
 
 
 @app.route("/api/tasks/<int:task_id>", methods=["DELETE"])
 def delete_task(task_id):
     conn = get_db()
-    existing = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    user = get_current_user(conn)
+    if not user:
+        conn.close()
+        return auth_error()
+    existing = conn.execute(
+        "SELECT * FROM tasks WHERE id = ? AND user_id = ?", (task_id, user["id"])
+    ).fetchone()
     if not existing:
         conn.close()
         return jsonify({"error": "task not found"}), 404
@@ -409,22 +607,30 @@ def _get_analytics_date_params():
     return start_date, end_date
 
 
-def _heatmap_summary(conn, today):
+def _heatmap_summary(conn, today, user_id):
     total_completions = conn.execute(
         """
         SELECT COUNT(*) AS total
         FROM tasks
-        WHERE status = 'done' AND completed_at IS NOT NULL AND completed_at != ''
-        """
+        WHERE user_id = ?
+          AND status = 'done'
+          AND completed_at IS NOT NULL
+          AND completed_at != ''
+        """,
+        (user_id,),
     ).fetchone()["total"]
     completion_rows = conn.execute(
         """
         SELECT date(completed_at) AS completion_day
         FROM tasks
-        WHERE status = 'done' AND completed_at IS NOT NULL AND completed_at != ''
+        WHERE user_id = ?
+          AND status = 'done'
+          AND completed_at IS NOT NULL
+          AND completed_at != ''
         GROUP BY date(completed_at)
         ORDER BY completion_day ASC
-        """
+        """,
+        (user_id,),
     ).fetchall()
     completion_days = [datetime.strptime(row["completion_day"], "%Y-%m-%d").date() for row in completion_rows]
     completion_day_set = set(completion_days)
@@ -455,7 +661,7 @@ def _heatmap_summary(conn, today):
     }
 
 
-def _build_heatmap_grid(conn, today):
+def _build_heatmap_grid(conn, today, user_id):
     current_week_monday = today - timedelta(days=today.weekday())
     grid_start = current_week_monday - timedelta(weeks=11)
     grid_end = current_week_monday + timedelta(days=6)
@@ -463,13 +669,14 @@ def _build_heatmap_grid(conn, today):
         """
         SELECT date(completed_at) AS completion_day, COUNT(*) AS completion_count
         FROM tasks
-        WHERE status = 'done'
+        WHERE user_id = ?
+          AND status = 'done'
           AND completed_at IS NOT NULL
           AND completed_at != ''
           AND date(completed_at) BETWEEN ? AND ?
         GROUP BY date(completed_at)
         """,
-        (grid_start.isoformat(), grid_end.isoformat()),
+        (user_id, grid_start.isoformat(), grid_end.isoformat()),
     ).fetchall()
     daily_counts = {row["completion_day"]: row["completion_count"] for row in daily_counts_rows}
     max_count = max(daily_counts.values(), default=0)
@@ -558,9 +765,13 @@ def analytics_trends():
 @app.route("/api/analytics/heatmap", methods=["GET"])
 def analytics_heatmap():
     conn = get_db()
+    user = get_current_user(conn)
+    if not user:
+        conn.close()
+        return auth_error()
     today = datetime.now(timezone.utc).date()
-    heatmap = _build_heatmap_grid(conn, today)
-    summary = _heatmap_summary(conn, today)
+    heatmap = _build_heatmap_grid(conn, today, user["id"])
+    summary = _heatmap_summary(conn, today, user["id"])
     conn.close()
     return jsonify(
         {
