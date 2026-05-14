@@ -1,11 +1,16 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session
+from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
+import re
 import random
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "taskflow.db")
+# Sessions are signed (not encrypted); rotate by overriding the env var in real deployments.
+app.secret_key = os.environ.get("TASKFLOW_SECRET_KEY", "taskflow-dev-secret-do-not-use-in-prod")
 
 
 def get_db():
@@ -15,13 +20,15 @@ def get_db():
 
 
 def migrate_add_columns(conn):
-    """Add created_at and completed_at if they don't exist."""
+    """Add columns if they don't exist on a pre-existing schema."""
     cursor = conn.execute("PRAGMA table_info(tasks)")
     cols = [row[1] for row in cursor.fetchall()]
     if "created_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP")
     if "completed_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT")
+    if "user_id" not in cols:
+        conn.execute("ALTER TABLE tasks ADD COLUMN user_id INTEGER")
     # Backfill existing rows
     conn.execute(
         "UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL OR created_at = ''"
@@ -34,6 +41,15 @@ def migrate_add_columns(conn):
 def init_db():
     conn = get_db()
     conn.execute(
+        """CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
+    conn.execute(
         """CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -41,7 +57,8 @@ def init_db():
             category TEXT NOT NULL DEFAULT 'Planning',
             priority TEXT NOT NULL DEFAULT 'medium',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            completed_at TEXT
+            completed_at TEXT,
+            user_id INTEGER REFERENCES users(id)
         )"""
     )
     migrate_add_columns(conn)
@@ -56,7 +73,8 @@ def row_to_dict(row):
     return {key: row[key] for key in row.keys()}
 
 
-TASK_COLUMNS = "id, title, status, category, priority, created_at, completed_at"
+TASK_COLUMNS = "id, title, status, category, priority, created_at, completed_at, user_id"
+USER_PUBLIC_COLUMNS = "id, username, display_name, created_at"
 
 
 def normalize_title(title):
@@ -70,6 +88,71 @@ def normalize_priority(priority):
     if priority and str(priority).strip().lower() in valid:
         return str(priority).strip().lower()
     return None
+
+
+# --- Auth helpers ---
+
+USERNAME_RE = re.compile(r"^[a-zA-Z0-9_.-]{3,32}$")
+MIN_PASSWORD_LEN = 6
+
+
+def normalize_username(value):
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip().lower()
+    if not USERNAME_RE.match(candidate):
+        return None
+    return candidate
+
+
+def normalize_display_name(value, fallback):
+    if isinstance(value, str) and value.strip():
+        return value.strip()[:64]
+    return fallback
+
+
+def get_user_by_id(conn, user_id):
+    if user_id is None:
+        return None
+    row = conn.execute(
+        f"SELECT {USER_PUBLIC_COLUMNS} FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    return row_to_dict(row) if row else None
+
+
+def get_user_auth_row(conn, username):
+    return conn.execute(
+        "SELECT id, username, password_hash, display_name, created_at FROM users WHERE username = ?",
+        (username,),
+    ).fetchone()
+
+
+def current_user_id():
+    """Return the logged-in user id from the Flask session, or None."""
+    return session.get("user_id")
+
+
+def current_user():
+    """Return a dict of the logged-in user (public fields), or None."""
+    user_id = current_user_id()
+    if user_id is None:
+        return None
+    conn = get_db()
+    try:
+        return get_user_by_id(conn, user_id)
+    finally:
+        conn.close()
+
+
+def require_auth(view):
+    """Decorator: return 401 JSON if the request has no logged-in user."""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if current_user_id() is None:
+            return jsonify({"error": "authentication required"}), 401
+        return view(*args, **kwargs)
+
+    return wrapper
 
 
 def generate_demo_data(conn):
@@ -146,11 +229,20 @@ def index():
 def get_tasks():
     conn = get_db()
     status = request.args.get("status")
+    mine = request.args.get("mine")
     conditions = []
     params = []
     if status and status != "all":
         conditions.append("status = ?")
         params.append(status)
+    # `?mine=true` returns only the logged-in user's tasks (and demo seed rows with NULL user_id are excluded).
+    if mine and mine.lower() in {"1", "true", "yes"}:
+        user_id = current_user_id()
+        if user_id is None:
+            conn.close()
+            return jsonify({"error": "authentication required"}), 401
+        conditions.append("user_id = ?")
+        params.append(user_id)
     if conditions:
         where = " AND ".join(conditions)
         rows = conn.execute(
@@ -170,10 +262,11 @@ def create_task():
         return jsonify({"error": "title is required"}), 400
     category = data.get("category", "Planning").strip() or "Planning"
     priority = normalize_priority(data.get("priority")) or "medium"
+    user_id = current_user_id()
     conn = get_db()
     cursor = conn.execute(
-        "INSERT INTO tasks (title, status, category, priority) VALUES (?, 'todo', ?, ?)",
-        (title, category, priority),
+        "INSERT INTO tasks (title, status, category, priority, user_id) VALUES (?, 'todo', ?, ?, ?)",
+        (title, category, priority, user_id),
     )
     conn.commit()
     row = conn.execute(
@@ -463,6 +556,175 @@ def analytics_trends():
 @app.route("/analytics")
 def analytics_page():
     return send_from_directory(".", "analytics.html")
+
+
+# --- Auth API ---
+
+
+@app.route("/api/auth/signup", methods=["POST"])
+def auth_signup():
+    data = request.get_json(silent=True) or {}
+    raw_username = data.get("username")
+    username = normalize_username(raw_username)
+    if not username:
+        return jsonify({
+            "error": "username must be 3-32 chars: letters, numbers, '.', '_', '-'"
+        }), 400
+    password = data.get("password")
+    if not isinstance(password, str) or len(password) < MIN_PASSWORD_LEN:
+        return jsonify({"error": f"password must be at least {MIN_PASSWORD_LEN} characters"}), 400
+    display_name = normalize_display_name(data.get("display_name"), username)
+    conn = get_db()
+    try:
+        existing = get_user_auth_row(conn, username)
+        if existing:
+            return jsonify({"error": "username is already taken"}), 409
+        cursor = conn.execute(
+            "INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)",
+            (username, generate_password_hash(password), display_name),
+        )
+        conn.commit()
+        new_user = get_user_by_id(conn, cursor.lastrowid)
+    finally:
+        conn.close()
+    session.clear()
+    session["user_id"] = new_user["id"]
+    session.permanent = True
+    return jsonify(new_user), 201
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def auth_login():
+    data = request.get_json(silent=True) or {}
+    username = normalize_username(data.get("username"))
+    password = data.get("password")
+    if not username or not isinstance(password, str) or not password:
+        return jsonify({"error": "invalid username or password"}), 401
+    conn = get_db()
+    try:
+        row = get_user_auth_row(conn, username)
+        if not row or not check_password_hash(row["password_hash"], password):
+            return jsonify({"error": "invalid username or password"}), 401
+        public = get_user_by_id(conn, row["id"])
+    finally:
+        conn.close()
+    session.clear()
+    session["user_id"] = public["id"]
+    session.permanent = True
+    return jsonify(public), 200
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def auth_logout():
+    session.clear()
+    return "", 204
+
+
+@app.route("/api/auth/me", methods=["GET"])
+def auth_me():
+    user = current_user()
+    if not user:
+        return jsonify({"error": "not authenticated"}), 401
+    return jsonify(user)
+
+
+# --- Per-user metrics ---
+
+
+def _compute_user_metrics(conn, user_id):
+    """Aggregate the logged-in user's tasks into the metrics shape."""
+    rows = conn.execute(
+        f"SELECT {TASK_COLUMNS} FROM tasks WHERE user_id = ?", (user_id,)
+    ).fetchall()
+    tasks = [row_to_dict(r) for r in rows]
+    total = len(tasks)
+    by_status = {"todo": 0, "in-progress": 0, "done": 0}
+    by_category = {}
+    by_priority = {"high": 0, "medium": 0, "low": 0}
+    for t in tasks:
+        by_status[t["status"]] = by_status.get(t["status"], 0) + 1
+        by_category[t["category"]] = by_category.get(t["category"], 0) + 1
+        by_priority[t["priority"]] = by_priority.get(t["priority"], 0) + 1
+
+    completion_rate = round((by_status["done"] / total) * 100, 1) if total else 0.0
+
+    today = datetime.now(timezone.utc).date()
+    completed_days_set = set()
+    completed_last_7d = 0
+    seven_days_ago = today - timedelta(days=7)
+    for t in tasks:
+        if t["status"] == "done" and t["completed_at"]:
+            try:
+                d = datetime.strptime(t["completed_at"][:10], "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            completed_days_set.add(d)
+            if d >= seven_days_ago:
+                completed_last_7d += 1
+
+    streak_days = 0
+    cursor_date = today
+    while cursor_date in completed_days_set:
+        streak_days += 1
+        cursor_date -= timedelta(days=1)
+
+    daily_volume = []
+    for offset in range(13, -1, -1):
+        day = today - timedelta(days=offset)
+        day_label = day.strftime("%Y-%m-%d")
+        created_count = 0
+        completed_count = 0
+        for t in tasks:
+            if t["created_at"] and t["created_at"][:10] == day_label:
+                created_count += 1
+            if t["status"] == "done" and t["completed_at"] and t["completed_at"][:10] == day_label:
+                completed_count += 1
+        daily_volume.append({
+            "date": day_label,
+            "created": created_count,
+            "completed": completed_count,
+        })
+
+    return {
+        "total_tasks": total,
+        "completion_rate": completion_rate,
+        "streak_days": streak_days,
+        "completed_last_7_days": completed_last_7d,
+        "by_status": by_status,
+        "by_category": [{"name": k, "count": v} for k, v in sorted(by_category.items())],
+        "by_priority": [{"name": k, "count": by_priority.get(k, 0)} for k in ("high", "medium", "low")],
+        "daily_volume": daily_volume,
+    }
+
+
+@app.route("/api/metrics/me", methods=["GET"])
+@require_auth
+def metrics_me():
+    user = current_user()
+    conn = get_db()
+    try:
+        metrics = _compute_user_metrics(conn, user["id"])
+    finally:
+        conn.close()
+    return jsonify({"user": user, "metrics": metrics})
+
+
+# --- Auth pages ---
+
+
+@app.route("/signup")
+def signup_page():
+    return send_from_directory(".", "signup.html")
+
+
+@app.route("/login")
+def login_page():
+    return send_from_directory(".", "login.html")
+
+
+@app.route("/metrics")
+def metrics_page():
+    return send_from_directory(".", "metrics.html")
 
 
 if __name__ == "__main__":
