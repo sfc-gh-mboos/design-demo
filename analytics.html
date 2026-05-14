@@ -15,10 +15,14 @@
         <span class="logo-mark"></span>
         <span class="logo-text">Taskflow</span>
       </div>
-      <nav class="topbar-nav">
+      <nav class="topbar-nav" id="topbarNav">
         <a href="/" class="nav-link">Tasks</a>
         <a href="/analytics" class="nav-link active">Analytics</a>
+        <a href="/metrics" class="nav-link">My Metrics</a>
       </nav>
+      <div class="auth-status" id="authStatus" data-state="anonymous">
+        <a href="/login" class="auth-link">Log in</a>
+      </div>
     </div>
   </header>
 
@@ -103,6 +107,7 @@
     </div>
   </main>
 
+  <script src="auth-status.js"></script>
   <script src="analytics.js"></script>
 </body>
 </html>
