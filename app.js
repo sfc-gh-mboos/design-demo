@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const taskList = document.getElementById("taskList");
   const listView = document.getElementById("listView");
   const boardView = document.getElementById("boardView");
+  const topbarNav = document.getElementById("topbarNav");
   const dateLabel = document.getElementById("dateLabel");
   const authPanel = document.getElementById("authPanel");
   const appShell = document.getElementById("appShell");
@@ -213,6 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
     state.tasks = [];
     authPanel.classList.remove("hidden");
     appShell.classList.add("hidden");
+    topbarNav.classList.add("hidden");
     profileActions.classList.add("hidden");
     profileName.textContent = "";
     render();
@@ -221,6 +223,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function showSignedIn(user) {
     state.user = user;
     profileName.textContent = user.name;
+    topbarNav.classList.remove("hidden");
     profileActions.classList.remove("hidden");
     authPanel.classList.add("hidden");
     appShell.classList.remove("hidden");

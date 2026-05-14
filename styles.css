@@ -660,6 +660,9 @@ body {
   height: 18px;
   border-radius: 50%;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   cursor: pointer;
   font: inherit;
@@ -678,6 +681,15 @@ body {
 .status-done {
   border: 2px solid rgba(245, 78, 0, 0.5);
   background: rgba(245, 78, 0, 0.2);
+}
+
+.status-done::after {
+  content: "";
+  width: 5px;
+  height: 9px;
+  border: solid var(--accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
 }
 
 /* ---- Task body ---- */
