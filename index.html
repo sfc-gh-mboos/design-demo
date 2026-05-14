@@ -18,12 +18,59 @@
         <a href="/" class="nav-link active">Tasks</a>
         <a href="/analytics" class="nav-link">Analytics</a>
       </nav>
+      <div class="profile-actions hidden" id="profileActions">
+        <span class="profile-name" id="profileName"></span>
+        <button class="logout-btn" id="logoutBtn" type="button">Log out</button>
+      </div>
     </div>
   </header>
 
-  <main class="container">
+  <section class="auth-panel" id="authPanel" aria-labelledby="authTitle">
+    <div class="auth-card">
+      <p class="auth-eyebrow">Personal workspace</p>
+      <h1 id="authTitle">Create your Taskflow profile</h1>
+      <p class="auth-copy">Sign up or log in to keep your tasks and productivity stats private.</p>
+      <div class="auth-toggle" role="tablist" aria-label="Authentication mode">
+        <button class="auth-toggle-btn active" id="signupModeBtn" type="button" data-auth-mode="signup" role="tab" aria-selected="true">Sign up</button>
+        <button class="auth-toggle-btn" id="loginModeBtn" type="button" data-auth-mode="login" role="tab" aria-selected="false">Log in</button>
+      </div>
+      <form class="auth-form" id="authForm">
+        <div class="auth-name-field" id="authNameField">
+          <label class="form-label" for="authNameInput">Name</label>
+          <input id="authNameInput" class="form-input" type="text" autocomplete="name" placeholder="Ada Lovelace">
+        </div>
+        <label class="form-label" for="authEmailInput">Email</label>
+        <input id="authEmailInput" class="form-input" type="email" autocomplete="email" placeholder="you@example.com" required>
+        <label class="form-label" for="authPasswordInput">Password</label>
+        <input id="authPasswordInput" class="form-input" type="password" autocomplete="current-password" minlength="8" required>
+        <p class="auth-error" id="authError" role="alert"></p>
+        <button class="form-submit" id="authSubmitBtn" type="submit">Create profile</button>
+      </form>
+    </div>
+  </section>
+
+  <main class="container app-shell hidden" id="appShell">
     <section class="hero hero--tasks" aria-labelledby="heroTitle">
       <h1 id="heroTitle">Daily Tasks</h1>
+    </section>
+
+    <section class="personal-stats" id="personalStats" aria-label="Personal stats">
+      <article class="stat-card">
+        <span class="stat-value" id="statTotal">0</span>
+        <span class="stat-label">Total tasks</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-value" id="statCompletion">0%</span>
+        <span class="stat-label">Completion</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-value" id="statDone">0</span>
+        <span class="stat-label">Done</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-value" id="statHighPriority">0</span>
+        <span class="stat-label">High priority</span>
+      </article>
     </section>
 
     <div class="toolbar">
