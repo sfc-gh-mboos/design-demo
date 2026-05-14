@@ -258,7 +258,16 @@ document.addEventListener("DOMContentLoaded", () => {
     priority.className = `priority priority-${task.priority}`;
     priority.textContent = PRIORITY_LABELS[task.priority] || task.priority;
 
-    li.append(statusDot, body, priority);
+    const statusButton = document.createElement("button");
+    statusButton.type = "button";
+    statusButton.className = "status-action";
+    statusButton.textContent = STATUS_ACTION_LABELS[task.status] || "Update";
+    statusButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      cycleStatus(task);
+    });
+
+    li.append(statusDot, body, priority, statusButton);
     return li;
   }
 
@@ -362,6 +371,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Actions ---
 
   const STATUS_CYCLE = { todo: "in-progress", "in-progress": "done", done: "todo" };
+  const STATUS_ACTION_LABELS = { todo: "Start", "in-progress": "Mark done", done: "Reopen" };
 
   async function cycleStatus(task) {
     const previousStatus = task.status;
