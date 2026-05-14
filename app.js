@@ -363,9 +363,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const STATUS_CYCLE = { todo: "in-progress", "in-progress": "done", done: "todo" };
 
   async function cycleStatus(task) {
+    const previousStatus = task.status;
     const nextStatus = STATUS_CYCLE[task.status];
-    await TaskAPI.update(task.id, { status: nextStatus });
-    await loadTasks();
+    task.status = nextStatus;
+    render();
+    try {
+      await TaskAPI.update(task.id, { status: nextStatus });
+      await loadTasks();
+    } catch (error) {
+      task.status = previousStatus;
+      await loadTasks();
+      showErrorFeedback(error.message || "Failed to update task status.");
+    }
   }
 
   // --- Drag and Drop (KN-5) ---
