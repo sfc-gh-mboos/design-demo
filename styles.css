@@ -1418,6 +1418,15 @@ body {
   }
 }
 
+/* ---- Hidden attribute (used by auth/metrics pages) ---- */
+/* The HTML5 `hidden` attribute is overridden by any author rule that sets
+ * `display`, so we re-assert it here. Without this, .metrics-gate (display:
+ * flex) and .metrics-content (display: block) leak through when toggled via
+ * the `hidden` property in JS. */
+[hidden] {
+  display: none !important;
+}
+
 /* ---- Auth status (topbar) ---- */
 
 .topbar-inner {
