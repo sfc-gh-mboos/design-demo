@@ -234,10 +234,11 @@ document.addEventListener("DOMContentLoaded", () => {
     li.dataset.category = task.category.toLowerCase();
     li.dataset.id = task.id;
 
-    const statusDot = document.createElement("div");
+    const statusDot = document.createElement("button");
+    statusDot.type = "button";
     statusDot.className = `status-indicator status-${task.status}`;
-    statusDot.style.cursor = "pointer";
     statusDot.title = "Cycle status";
+    statusDot.setAttribute("aria-label", `Move ${task.title} to ${STATUS_CYCLE[task.status]}`);
     statusDot.addEventListener("click", (e) => {
       e.stopPropagation();
       cycleStatus(task);
