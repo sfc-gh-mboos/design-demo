@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 import sqlite3
 import os
 import random
+import math
 from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__, static_folder=".", static_url_path="")
@@ -15,13 +16,15 @@ def get_db():
 
 
 def migrate_add_columns(conn):
-    """Add created_at and completed_at if they don't exist."""
+    """Add created_at, completed_at, and focus_today if they don't exist."""
     cursor = conn.execute("PRAGMA table_info(tasks)")
     cols = [row[1] for row in cursor.fetchall()]
     if "created_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP")
     if "completed_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT")
+    if "focus_today" not in cols:
+        conn.execute("ALTER TABLE tasks ADD COLUMN focus_today INTEGER NOT NULL DEFAULT 0")
     # Backfill existing rows
     conn.execute(
         "UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL OR created_at = ''"
@@ -41,7 +44,8 @@ def init_db():
             category TEXT NOT NULL DEFAULT 'Planning',
             priority TEXT NOT NULL DEFAULT 'medium',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            completed_at TEXT
+            completed_at TEXT,
+            focus_today INTEGER NOT NULL DEFAULT 0
         )"""
     )
     migrate_add_columns(conn)
@@ -53,7 +57,10 @@ def init_db():
 
 
 def row_to_dict(row):
-    return {key: row[key] for key in row.keys()}
+    data = {key: row[key] for key in row.keys()}
+    if "focus_today" in data:
+        data["focus_today"] = bool(data["focus_today"])
+    return data
 
 
 def normalize_title(title):
@@ -66,6 +73,22 @@ def normalize_priority(priority):
     valid = {"high", "medium", "low"}
     if priority and str(priority).strip().lower() in valid:
         return str(priority).strip().lower()
+    return None
+
+
+def normalize_focus_today(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off", ""}:
+            return False
     return None
 
 
@@ -195,15 +218,32 @@ def update_task(task_id):
     else:
         new_priority = existing["priority"]
     new_status = data.get("status", existing["status"])
-    completed_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if new_status == "done" else None
+    if "focus_today" in data:
+        new_focus = normalize_focus_today(data.get("focus_today"))
+        if new_focus is None:
+            conn.close()
+            return jsonify({"error": "focus_today must be a boolean"}), 400
+    else:
+        new_focus = bool(existing["focus_today"]) if "focus_today" in existing.keys() else False
+
+    if new_status == "done":
+        completed_at = (
+            existing["completed_at"]
+            if new_status == existing["status"] and existing["completed_at"]
+            else datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        )
+    else:
+        completed_at = None
+
     conn.execute(
-        "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=? WHERE id=?",
+        "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=?, focus_today=? WHERE id=?",
         (
             new_title,
             new_status,
             data.get("category", existing["category"]),
             new_priority,
             completed_at,
+            1 if new_focus else 0,
             task_id,
         ),
     )
@@ -411,141 +451,124 @@ def _get_analytics_date_params():
     return start_date, end_date
 
 
-def _compute_streaks(completion_dates):
-    """Compute current and longest streak from an ordered list of date objects."""
-    if not completion_dates:
-        return 0, 0
+def _compute_streaks(completed_dates, end_date):
+    """Compute current and longest completion streaks from a set of date objects."""
+    if not completed_dates:
+        return {"current_streak": 0, "longest_streak": 0}
 
-    completion_set = set(completion_dates)
+    current_streak = 0
+    probe = end_date
+    while probe in completed_dates:
+        current_streak += 1
+        probe -= timedelta(days=1)
 
-    today = datetime.now(timezone.utc).date()
-    current = 0
-    cursor = today
-    while cursor in completion_set:
-        current += 1
-        cursor -= timedelta(days=1)
-
-    longest = 0
+    longest_streak = 0
     running = 0
     previous = None
-    for completion_date in sorted(completion_dates):
-        if previous is None or completion_date == previous + timedelta(days=1):
+    for day in sorted(completed_dates):
+        if previous and (day - previous).days == 1:
             running += 1
         else:
             running = 1
-        longest = max(longest, running)
-        previous = completion_date
+        if running > longest_streak:
+            longest_streak = running
+        previous = day
 
-    return current, longest
+    return {"current_streak": current_streak, "longest_streak": longest_streak}
 
 
 def _build_heatmap_payload(start_date=None, end_date=None):
-    """
-    Build heatmap payload from task completion timestamps.
-    Defaults to the last 12 weeks (Monday-start) ending at the current week.
-    """
+    """Build Monday-aligned heatmap data from tasks.completed_at."""
     today = datetime.now(timezone.utc).date()
-    current_week_start = today - timedelta(days=today.weekday())
+    if end_date is None:
+        end_date = today
+    if start_date is None:
+        start_date = end_date - timedelta(weeks=11)
 
-    if start_date is None and end_date is None:
-        range_start = current_week_start - timedelta(weeks=11)
-        range_end = range_start + timedelta(days=83)
-    else:
-        if start_date is None and end_date is not None:
-            range_end = end_date
-            range_start = range_end - timedelta(days=83)
-        elif start_date is not None and end_date is None:
-            range_start = start_date
-            range_end = range_start + timedelta(days=83)
-        else:
-            range_start = start_date
-            range_end = end_date
-            if range_end < range_start:
-                range_start, range_end = range_end, range_start
-        range_start = range_start - timedelta(days=range_start.weekday())
-        range_end = range_end + timedelta(days=(6 - range_end.weekday()))
+    aligned_start = start_date - timedelta(days=start_date.weekday())
+    aligned_end = end_date + timedelta(days=(6 - end_date.weekday()))
 
     conn = get_db()
-    range_rows = conn.execute(
+    daily_rows = conn.execute(
         """
         SELECT date(completed_at) AS day, COUNT(*) AS count
         FROM tasks
-        WHERE status = 'done'
-          AND completed_at IS NOT NULL
+        WHERE completed_at IS NOT NULL
           AND date(completed_at) BETWEEN ? AND ?
         GROUP BY date(completed_at)
         ORDER BY day ASC
         """,
-        (range_start.isoformat(), range_end.isoformat()),
+        (aligned_start.isoformat(), aligned_end.isoformat()),
     ).fetchall()
-    all_rows = conn.execute(
+
+    streak_rows = conn.execute(
         """
-        SELECT date(completed_at) AS day, COUNT(*) AS count
+        SELECT DISTINCT date(completed_at) AS day
         FROM tasks
-        WHERE status = 'done'
-          AND completed_at IS NOT NULL
-        GROUP BY date(completed_at)
+        WHERE completed_at IS NOT NULL
+          AND date(completed_at) <= ?
         ORDER BY day ASC
-        """
+        """,
+        (aligned_end.isoformat(),),
     ).fetchall()
     conn.close()
 
-    counts_by_day = {row["day"]: row["count"] for row in range_rows}
-    all_completion_dates = [
+    counts_by_day = {row["day"]: int(row["count"]) for row in daily_rows if row["day"]}
+    completed_dates = {
         datetime.strptime(row["day"], "%Y-%m-%d").date()
-        for row in all_rows
+        for row in streak_rows
         if row["day"]
-    ]
-    total_completions = sum(row["count"] for row in all_rows)
-    current_streak, longest_streak = _compute_streaks(all_completion_dates)
+    }
 
-    days = (range_end - range_start).days + 1
-    total_weeks = max(1, days // 7)
     max_count = max(counts_by_day.values(), default=0)
-
+    day_count = (aligned_end - aligned_start).days + 1
+    weeks = day_count // 7
     cells = []
     month_labels = []
     seen_months = set()
-    for i in range(days):
-        day = range_start + timedelta(days=i)
-        day_key = day.isoformat()
-        count = int(counts_by_day.get(day_key, 0))
-        week_index = i // 7
-        day_index = day.weekday()  # Mon=0..Sun=6
-        if day.day == 1 or (week_index == 0 and day.month not in seen_months):
-            month_labels.append(
-                {
-                    "label": day.strftime("%b"),
-                    "week_index": week_index,
-                }
-            )
-            seen_months.add(day.month)
 
-        if count == 0 or max_count == 0:
-            intensity_level = 0
-        else:
-            intensity_level = min(5, max(1, int((count / max_count) * 5 + 0.9999)))
+    for day_offset in range(day_count):
+        current_day = aligned_start + timedelta(days=day_offset)
+        week_index = day_offset // 7
+        day_key = current_day.isoformat()
+        count = counts_by_day.get(day_key, 0)
+        intensity_level = 0
+        if count > 0 and max_count > 0:
+            intensity_level = min(5, max(1, math.ceil((count / max_count) * 5)))
+
+        if current_day.weekday() == 0:
+            month_key = (current_day.year, current_day.month)
+            if week_index == 0 or month_key not in seen_months:
+                month_labels.append(
+                    {
+                        "label": current_day.strftime("%b"),
+                        "week_index": week_index,
+                    }
+                )
+                seen_months.add(month_key)
 
         cells.append(
             {
                 "date": day_key,
                 "week_index": week_index,
-                "day_index": day_index,
+                "day_index": current_day.weekday(),
                 "count": count,
                 "intensity_level": intensity_level,
             }
         )
 
+    streaks = _compute_streaks(completed_dates, aligned_end)
+
     return {
-        "range_start": range_start.isoformat(),
-        "range_end": range_end.isoformat(),
-        "weeks": total_weeks,
+        "range_start": aligned_start.isoformat(),
+        "range_end": aligned_end.isoformat(),
+        "weeks": weeks,
         "day_labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         "month_labels": month_labels,
         "summary": {
-            "current_streak": current_streak,
-            "longest_streak": longest_streak,
-            "total_completions": total_completions,
+            "current_streak": streaks["current_streak"],
+            "longest_streak": streaks["longest_streak"],
+            "total_completions": sum(counts_by_day.values()),
         },
         "cells": cells,
     }

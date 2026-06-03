@@ -1,122 +1,97 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const currentStreakNode = document.getElementById("currentStreak");
-  const longestStreakNode = document.getElementById("longestStreak");
-  const totalCompletionsNode = document.getElementById("totalCompletions");
-  const monthLabelsNode = document.getElementById("monthLabels");
-  const gridNode = document.getElementById("heatmapGrid");
-  const tooltipNode = document.getElementById("heatmapTooltip");
+  const grid = document.getElementById("heatmapGrid");
+  const monthAxis = document.getElementById("heatmapMonthAxis");
+  const tooltip = document.getElementById("heatmapTooltip");
+  const currentStreakEl = document.getElementById("currentStreak");
+  const longestStreakEl = document.getElementById("longestStreak");
+  const totalCompletionsEl = document.getElementById("totalCompletions");
 
-  const HeatmapAPI = {
-    async getData() {
-      const response = await fetch("/api/analytics/heatmap");
-      if (!response.ok) {
-        throw new Error(`Failed to fetch heatmap data: ${response.statusText}`);
-      }
-      return response.json();
-    },
-  };
-
-  function formatDateLabel(dateString) {
-    const date = new Date(`${dateString}T00:00:00`);
-    return date.toLocaleDateString("en-US", {
+  function formatDateLabel(dateValue) {
+    const date = new Date(`${dateValue}T12:00:00`);
+    return date.toLocaleDateString(undefined, {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
   }
 
-  function formatCount(count) {
-    return `${count} task${count === 1 ? "" : "s"} completed`;
-  }
-
-  function positionTooltip(event) {
-    const margin = 14;
-    const { clientX, clientY } = event;
-    const tooltipRect = tooltipNode.getBoundingClientRect();
-    const nextLeft = Math.min(
-      window.innerWidth - tooltipRect.width - margin,
-      clientX + margin
-    );
-    const nextTop = Math.max(margin, clientY - tooltipRect.height - margin);
-    tooltipNode.style.left = `${nextLeft}px`;
-    tooltipNode.style.top = `${nextTop}px`;
-  }
-
-  function showTooltip(event, cell) {
-    tooltipNode.textContent = `${formatDateLabel(cell.date)} - ${formatCount(cell.count)}`;
-    tooltipNode.classList.add("visible");
-    positionTooltip(event);
+  function showTooltip(cell, content) {
+    tooltip.textContent = content;
+    tooltip.classList.remove("hidden");
+    const rect = cell.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const x = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+    const y = rect.top - tooltipRect.height - 8;
+    tooltip.style.left = `${Math.max(8, x)}px`;
+    tooltip.style.top = `${Math.max(8, y)}px`;
   }
 
   function hideTooltip() {
-    tooltipNode.classList.remove("visible");
+    tooltip.classList.add("hidden");
   }
 
-  function renderMonthLabels(monthLabels, weeks) {
-    monthLabelsNode.textContent = "";
-    monthLabelsNode.style.gridTemplateColumns = `repeat(${weeks}, minmax(0, 1fr))`;
+  function renderMonthLabels(weeks, monthLabels) {
+    monthAxis.innerHTML = "";
+    monthAxis.style.gridTemplateColumns = `repeat(${weeks}, minmax(0, 1fr))`;
     monthLabels.forEach((month) => {
-      const node = document.createElement("span");
-      node.className = "heatmap-month";
-      node.style.gridColumn = `${month.week_index + 1} / span 1`;
-      node.textContent = month.label;
-      monthLabelsNode.appendChild(node);
+      const label = document.createElement("span");
+      label.textContent = month.label;
+      label.style.gridColumn = `${month.week_index + 1} / span 1`;
+      monthAxis.appendChild(label);
     });
   }
 
-  function renderGrid(cells, weeks) {
-    gridNode.textContent = "";
-    gridNode.style.gridTemplateColumns = `repeat(${weeks}, minmax(0, 1fr))`;
-    gridNode.setAttribute("aria-colcount", String(weeks));
-    gridNode.setAttribute("aria-rowcount", "7");
-
-    cells.forEach((cell) => {
+  function renderCells(data) {
+    grid.innerHTML = "";
+    grid.style.gridTemplateColumns = `repeat(${data.weeks}, minmax(0, 1fr))`;
+    data.cells.forEach((cell) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = `heatmap-cell intensity-${cell.intensity_level}`;
-      button.style.gridColumn = `${cell.week_index + 1}`;
-      button.style.gridRow = `${cell.day_index + 1}`;
+      button.style.gridColumn = `${cell.week_index + 1} / span 1`;
+      button.style.gridRow = `${cell.day_index + 1} / span 1`;
       button.setAttribute("role", "gridcell");
       button.setAttribute(
         "aria-label",
-        `${formatDateLabel(cell.date)}: ${formatCount(cell.count)}`
+        `${formatDateLabel(cell.date)}: ${cell.count} completed task${cell.count === 1 ? "" : "s"}`
       );
-      button.addEventListener("mouseenter", (event) => showTooltip(event, cell));
-      button.addEventListener("mousemove", positionTooltip);
+
+      const tooltipText = `${formatDateLabel(cell.date)}: ${cell.count} completed`;
+      button.addEventListener("mouseenter", () => showTooltip(button, tooltipText));
+      button.addEventListener("focus", () => showTooltip(button, tooltipText));
       button.addEventListener("mouseleave", hideTooltip);
-      button.addEventListener("focus", (event) => showTooltip(event, cell));
       button.addEventListener("blur", hideTooltip);
-      gridNode.appendChild(button);
+
+      grid.appendChild(button);
     });
   }
 
-  function renderSummary(summary) {
-    currentStreakNode.textContent = String(summary.current_streak || 0);
-    longestStreakNode.textContent = String(summary.longest_streak || 0);
-    totalCompletionsNode.textContent = String(summary.total_completions || 0);
+  function updateSummary(summary) {
+    currentStreakEl.textContent = summary.current_streak;
+    longestStreakEl.textContent = summary.longest_streak;
+    totalCompletionsEl.textContent = summary.total_completions;
   }
 
-  function renderHeatmap(payload) {
-    renderSummary(payload.summary);
-    renderMonthLabels(payload.month_labels, payload.weeks);
-    renderGrid(payload.cells, payload.weeks);
-  }
-
-  async function initHeatmap() {
+  async function loadHeatmap() {
     try {
-      const payload = await HeatmapAPI.getData();
-      renderHeatmap(payload);
+      const response = await fetch("/api/analytics/heatmap");
+      if (!response.ok) {
+        throw new Error(`Heatmap request failed: ${response.status}`);
+      }
+      const data = await response.json();
+      updateSummary(data.summary);
+      renderMonthLabels(data.weeks, data.month_labels);
+      renderCells(data);
     } catch (error) {
       console.error(error);
-      const message = document.createElement("div");
-      message.className = "error-feedback";
-      message.textContent = "Failed to load heatmap data. Please refresh the page.";
-      document.body.appendChild(message);
-      setTimeout(() => {
-        message.remove();
-      }, 5000);
+      tooltip.classList.add("hidden");
+      const fallback = document.createElement("p");
+      fallback.className = "heatmap-error";
+      fallback.textContent = "Unable to load heatmap data right now.";
+      grid.innerHTML = "";
+      grid.appendChild(fallback);
     }
   }
 
-  initHeatmap();
+  loadHeatmap();
 });
