@@ -213,6 +213,22 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
+    const focusTasks = tasks.filter((task) => task.focus_today);
+    const focusCountNode = boardView.querySelector('[data-column-count="focus"]');
+    const focusBodyNode = boardView.querySelector('[data-column-body="focus"]');
+    if (focusCountNode && focusBodyNode) {
+      focusCountNode.textContent = String(focusTasks.length);
+      focusBodyNode.innerHTML = "";
+      if (focusTasks.length === 0) {
+        const placeholder = document.createElement("p");
+        placeholder.className = "board-column-placeholder";
+        placeholder.textContent = "No tasks";
+        focusBodyNode.appendChild(placeholder);
+      } else {
+        focusTasks.forEach((task) => focusBodyNode.appendChild(renderBoardTask(task)));
+      }
+    }
+
     if (!columnDropZonesSetup) {
       setupAllColumnDropZones();
       columnDropZonesSetup = true;

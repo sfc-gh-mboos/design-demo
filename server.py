@@ -557,7 +557,7 @@ def _build_heatmap_payload(start_date=None, end_date=None):
             }
         )
 
-    streaks = _compute_streaks(completed_dates, aligned_end)
+    streaks = _compute_streaks(completed_dates, end_date)
 
     return {
         "range_start": aligned_start.isoformat(),
