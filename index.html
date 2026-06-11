@@ -24,7 +24,26 @@
 
   <main class="container">
     <section class="hero hero--tasks" aria-labelledby="heroTitle">
-      <h1 id="heroTitle">Daily Tasks</h1>
+      <div class="hero-card hero-card--tasks">
+        <div class="hero-main">
+          <p class="hero-eyebrow">Today at a glance</p>
+          <h1 id="heroTitle">Daily Tasks</h1>
+          <p class="hero-subtitle">
+            Plan with clarity, ship with momentum, and keep your day flowing.
+          </p>
+          <div class="hero-highlights" aria-label="Daily focus highlights">
+            <span class="hero-highlight">Focus Time</span>
+            <span class="hero-highlight">Top Priorities</span>
+            <span class="hero-highlight">Quick Wins</span>
+          </div>
+        </div>
+        <div class="hero-orb-wrap" aria-hidden="true">
+          <div class="hero-orb">
+            <span class="hero-orb-glow"></span>
+            <span class="hero-orb-label">Flow</span>
+          </div>
+        </div>
+      </div>
     </section>
 
     <div class="toolbar">
@@ -48,20 +67,17 @@
     </section>
 
     <section class="board-view hidden" id="boardView" aria-label="Kanban board">
-      <article class="board-focus-lane" data-board-column="focus" aria-label="Focus lane for must-do today tasks">
-        <header class="board-focus-header">
-          <div class="board-focus-heading">
-            <span class="board-focus-icon" aria-hidden="true">⚡</span>
-            <div>
-              <h2 class="board-focus-title">Focus Today</h2>
-              <p class="board-focus-subtitle">Must-do tasks pinned for today</p>
-            </div>
+      <section class="focus-lane" data-focus-lane aria-labelledby="focusLaneTitle">
+        <header class="focus-lane-header">
+          <div class="focus-lane-heading">
+            <span class="focus-lane-badge" aria-hidden="true">Must-do</span>
+            <h2 id="focusLaneTitle" class="focus-lane-title">Focus Today</h2>
+            <p class="focus-lane-subtitle">High-priority tasks that need your attention now</p>
           </div>
-          <span class="board-focus-count" data-column-count="focus">0</span>
+          <span class="focus-lane-count" data-focus-count aria-label="Focus task count">0</span>
         </header>
-        <div class="board-focus-body" data-column-body="focus"></div>
-      </article>
-
+        <div class="focus-lane-body" data-focus-body></div>
+      </section>
       <div class="board-status-columns">
       <article class="board-column" data-board-column="todo">
         <header class="board-column-header">

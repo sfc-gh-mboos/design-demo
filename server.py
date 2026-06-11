@@ -16,15 +16,13 @@ def get_db():
 
 
 def migrate_add_columns(conn):
-    """Add created_at, completed_at, and focus_today if they don't exist."""
+    """Add created_at and completed_at if they don't exist."""
     cursor = conn.execute("PRAGMA table_info(tasks)")
     cols = [row[1] for row in cursor.fetchall()]
     if "created_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP")
     if "completed_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT")
-    if "focus_today" not in cols:
-        conn.execute("ALTER TABLE tasks ADD COLUMN focus_today INTEGER NOT NULL DEFAULT 0")
     # Backfill existing rows
     conn.execute(
         "UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL OR created_at = ''"
@@ -44,8 +42,7 @@ def init_db():
             category TEXT NOT NULL DEFAULT 'Planning',
             priority TEXT NOT NULL DEFAULT 'medium',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            completed_at TEXT,
-            focus_today INTEGER NOT NULL DEFAULT 0
+            completed_at TEXT
         )"""
     )
     migrate_add_columns(conn)
@@ -57,10 +54,7 @@ def init_db():
 
 
 def row_to_dict(row):
-    data = {key: row[key] for key in row.keys()}
-    if "focus_today" in data:
-        data["focus_today"] = bool(data["focus_today"])
-    return data
+    return {key: row[key] for key in row.keys()}
 
 
 def normalize_title(title):
@@ -73,22 +67,6 @@ def normalize_priority(priority):
     valid = {"high", "medium", "low"}
     if priority and str(priority).strip().lower() in valid:
         return str(priority).strip().lower()
-    return None
-
-
-def normalize_focus_today(value):
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return bool(value)
-    if isinstance(value, str):
-        lowered = value.strip().lower()
-        if lowered in {"1", "true", "yes", "on"}:
-            return True
-        if lowered in {"0", "false", "no", "off", ""}:
-            return False
     return None
 
 
@@ -218,13 +196,6 @@ def update_task(task_id):
     else:
         new_priority = existing["priority"]
     new_status = data.get("status", existing["status"])
-    if "focus_today" in data:
-        new_focus = normalize_focus_today(data.get("focus_today"))
-        if new_focus is None:
-            conn.close()
-            return jsonify({"error": "focus_today must be a boolean"}), 400
-    else:
-        new_focus = bool(existing["focus_today"]) if "focus_today" in existing.keys() else False
 
     if new_status == "done":
         completed_at = (
@@ -236,14 +207,13 @@ def update_task(task_id):
         completed_at = None
 
     conn.execute(
-        "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=?, focus_today=? WHERE id=?",
+        "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=? WHERE id=?",
         (
             new_title,
             new_status,
             data.get("category", existing["category"]),
             new_priority,
             completed_at,
-            1 if new_focus else 0,
             task_id,
         ),
     )

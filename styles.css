@@ -134,6 +134,127 @@ body {
   text-align: center;
 }
 
+/* Tasks page hero */
+.hero--tasks {
+  padding: 28px 0 26px;
+}
+
+.hero-card--tasks {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 26px 24px 28px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(245, 78, 0, 0.2);
+  background:
+    radial-gradient(circle at 88% 12%, rgba(245, 78, 0, 0.16), transparent 52%),
+    linear-gradient(140deg, rgba(255, 255, 255, 0.72) 0%, var(--card) 48%, rgba(245, 78, 0, 0.06) 100%);
+  box-shadow:
+    0 1px 2px rgba(38, 37, 30, 0.05),
+    0 12px 34px rgba(38, 37, 30, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-card--tasks::after {
+  content: "";
+  position: absolute;
+  left: -12%;
+  bottom: -62%;
+  width: 66%;
+  height: 130%;
+  background: radial-gradient(circle at center, rgba(245, 78, 0, 0.1) 0%, transparent 68%);
+  pointer-events: none;
+}
+
+.hero--tasks .hero-main {
+  position: relative;
+  z-index: 1;
+}
+
+.hero--tasks .hero-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.hero--tasks h1 {
+  text-align: left;
+  font-size: clamp(1.55rem, 3.8vw, 1.95rem);
+  letter-spacing: -0.03em;
+}
+
+.hero--tasks .hero-subtitle {
+  margin-top: 10px;
+  color: var(--fg-secondary);
+  font-size: 0.92rem;
+  text-align: left;
+}
+
+.hero-highlights {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hero-highlight {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 78, 0, 0.2);
+  background: rgba(255, 255, 255, 0.66);
+  color: var(--fg);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.hero-orb-wrap {
+  width: 108px;
+  height: 108px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.hero-orb {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(245, 78, 0, 0.26);
+  background: radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.9) 0%, rgba(245, 78, 0, 0.2) 100%);
+  box-shadow:
+    inset 0 0 14px rgba(255, 255, 255, 0.65),
+    0 8px 20px rgba(245, 78, 0, 0.2);
+  position: relative;
+}
+
+.hero-orb-glow {
+  position: absolute;
+  inset: 14%;
+  border-radius: 50%;
+  border: 1px dashed rgba(245, 78, 0, 0.34);
+}
+
+.hero-orb-label {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: rgba(38, 37, 30, 0.85);
+}
+
 /* Tasks page hero — richer treatment */
 .hero--home {
   padding: 36px 0 28px;
@@ -506,146 +627,135 @@ body {
   gap: 14px;
 }
 
+/* ---- Focus lane ---- */
+
+.focus-lane {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(245, 78, 0, 0.08) 0%, var(--card) 42%, var(--card) 100%);
+  border: 1px solid rgba(245, 78, 0, 0.28);
+  border-radius: var(--radius);
+  box-shadow:
+    0 0 0 1px rgba(245, 78, 0, 0.06) inset,
+    0 8px 24px rgba(245, 78, 0, 0.1);
+}
+
+.focus-lane::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), rgba(245, 78, 0, 0.35));
+}
+
+.focus-lane-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(245, 78, 0, 0.14);
+}
+
+.focus-lane-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.focus-lane-badge {
+  align-self: flex-start;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  background: var(--accent-subtle);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.focus-lane-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.focus-lane-subtitle {
+  font-size: 0.78rem;
+  color: var(--fg-secondary);
+  line-height: 1.35;
+}
+
+.focus-lane-count {
+  flex-shrink: 0;
+  min-width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(245, 78, 0, 0.14);
+  border-radius: 999px;
+  padding: 0 8px;
+}
+
+.focus-lane-body {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px 16px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.focus-lane-body .board-task-card {
+  flex: 0 0 min(280px, 88vw);
+  scroll-snap-align: start;
+}
+
+.focus-lane[data-empty="true"] .focus-lane-body {
+  display: block;
+  overflow-x: visible;
+}
+
+.focus-lane-placeholder {
+  font-size: 0.82rem;
+  color: var(--fg-secondary);
+  padding: 8px 4px 4px;
+  line-height: 1.45;
+}
+
+.board-task-card--focus {
+  border-color: rgba(245, 78, 0, 0.35);
+  background: var(--bg);
+  box-shadow: 0 2px 10px rgba(245, 78, 0, 0.12);
+}
+
+.board-task-card--focus:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(245, 78, 0, 0.18);
+}
+
+.board-task-card--focus .board-task-priority {
+  animation: focusPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes focusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
 .board-status-columns {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-}
-
-/* ---- Focus swim lane ---- */
-
-.board-focus-lane {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, rgba(245, 78, 0, 0.14) 0%, var(--card) 42%, var(--card) 100%);
-  border: 2px solid rgba(245, 78, 0, 0.45);
-  border-radius: var(--radius);
-  box-shadow:
-    0 0 0 1px rgba(245, 78, 0, 0.08),
-    0 8px 28px rgba(245, 78, 0, 0.12);
-  animation: focusLanePulse 4s ease-in-out infinite;
-}
-
-.board-focus-lane::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 0%,
-    rgba(245, 78, 0, 0.06) 45%,
-    transparent 70%
-  );
-  pointer-events: none;
-}
-
-@keyframes focusLanePulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 1px rgba(245, 78, 0, 0.08),
-      0 8px 28px rgba(245, 78, 0, 0.12);
-  }
-  50% {
-    box-shadow:
-      0 0 0 1px rgba(245, 78, 0, 0.16),
-      0 10px 36px rgba(245, 78, 0, 0.2);
-  }
-}
-
-.board-focus-header {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid rgba(245, 78, 0, 0.2);
-}
-
-.board-focus-heading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.board-focus-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: rgba(245, 78, 0, 0.18);
-  font-size: 1.1rem;
-  line-height: 1;
-  box-shadow: inset 0 0 0 1px rgba(245, 78, 0, 0.25);
-}
-
-.board-focus-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--fg);
-  text-transform: none;
-}
-
-.board-focus-subtitle {
-  margin-top: 2px;
-  font-size: 0.76rem;
-  color: var(--fg-secondary);
-}
-
-.board-focus-count {
-  font-size: 0.82rem;
-  font-weight: 700;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 2px 10px rgba(245, 78, 0, 0.35);
-}
-
-.board-focus-body {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 12px 16px 16px;
-  min-height: 88px;
-}
-
-.board-focus-placeholder {
-  width: 100%;
-  margin: 0;
-  padding: 18px 16px;
-  text-align: center;
-  font-size: 0.84rem;
-  font-weight: 500;
-  color: rgba(245, 78, 0, 0.75);
-  border: 1px dashed rgba(245, 78, 0, 0.35);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.35);
-}
-
-.board-task-card--in-focus-lane {
-  flex: 1 1 220px;
-  max-width: 320px;
-  border-color: rgba(245, 78, 0, 0.35);
-  background: var(--bg);
-  box-shadow: 0 4px 14px rgba(245, 78, 0, 0.1);
-}
-
-.board-task-card--in-focus-lane:hover {
-  border-color: var(--accent);
-  box-shadow: 0 6px 18px rgba(245, 78, 0, 0.18);
-  transform: translateY(-1px);
-}
-
-.board-task-card--focus {
-  border-color: rgba(245, 78, 0, 0.28);
 }
 
 .board-task-footer {
@@ -692,54 +802,6 @@ body {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-}
-
-.task-card--focus {
-  border-color: rgba(245, 78, 0, 0.35);
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-
-.focus-pin-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--divider);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--fg-secondary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-}
-
-.focus-pin-btn:hover {
-  border-color: rgba(245, 78, 0, 0.45);
-  color: var(--accent);
-  background: var(--accent-subtle);
-}
-
-.focus-pin-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
-}
-
-.focus-pin-btn--active {
-  border-color: rgba(245, 78, 0, 0.5);
-  background: rgba(245, 78, 0, 0.12);
-  color: var(--accent);
-}
-
-.focus-pin-btn--lane {
-  width: 26px;
-  height: 26px;
-}
-
-.focus-pin-icon {
-  font-size: 0.95rem;
-  line-height: 1;
 }
 
 .board-column {
@@ -888,6 +950,29 @@ body {
     font-size: 1.4rem;
   }
 
+  .hero-card--tasks {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    padding: 22px 18px;
+    gap: 18px;
+  }
+
+  .hero--tasks .hero-eyebrow,
+  .hero--tasks h1,
+  .hero--tasks .hero-subtitle {
+    text-align: center;
+  }
+
+  .hero-highlights {
+    justify-content: center;
+  }
+
+  .hero-orb-wrap {
+    width: 92px;
+    height: 92px;
+  }
+
   .hero--home .hero-card {
     grid-template-columns: 1fr;
     justify-items: center;
@@ -935,12 +1020,17 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .board-focus-body {
+  .focus-lane-header {
     flex-direction: column;
+    align-items: stretch;
   }
 
-  .board-task-card--in-focus-lane {
-    max-width: none;
+  .focus-lane-count {
+    align-self: flex-start;
+  }
+
+  .focus-lane-body .board-task-card {
+    flex-basis: min(260px, 92vw);
   }
 
 }
