@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function showTooltip(cell, content) {
+  function showTooltip(cell, content, event) {
     tooltip.textContent = content;
     tooltip.classList.remove("hidden");
     const rect = cell.getBoundingClientRect();
@@ -44,6 +44,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderCells(data) {
     grid.innerHTML = "";
     grid.style.gridTemplateColumns = `repeat(${data.weeks}, minmax(0, 1fr))`;
+    grid.setAttribute("aria-colcount", String(data.weeks));
+    grid.setAttribute("aria-rowcount", "7");
     data.cells.forEach((cell) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -57,8 +59,8 @@ document.addEventListener("DOMContentLoaded", () => {
       );
 
       const tooltipText = `${formatDateLabel(cell.date)}: ${cell.count} completed`;
-      button.addEventListener("mouseenter", () => showTooltip(button, tooltipText));
-      button.addEventListener("focus", () => showTooltip(button, tooltipText));
+      button.addEventListener("mouseenter", (event) => showTooltip(button, tooltipText, event));
+      button.addEventListener("focus", (event) => showTooltip(button, tooltipText, event));
       button.addEventListener("mouseleave", hideTooltip);
       button.addEventListener("blur", hideTooltip);
 
