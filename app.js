@@ -117,6 +117,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const PRIORITY_LABELS = { high: "High", medium: "Med", low: "Low" };
   const BOARD_STATUSES = ["todo", "in-progress", "done"];
 
+  function todayIso() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function isDueToday(task) {
+    return task.due_date === todayIso();
+  }
+
+  function isPriorityLaneEligible(task) {
+    return task.priority === "high" && isDueToday(task);
+  }
+
+  function isInPriorityLane(task) {
+    return Boolean(task.pinned_priority) && isPriorityLaneEligible(task);
+  }
+
   function renderTask(task) {
     const li = document.createElement("li");
     li.className = "task-card";
@@ -173,13 +189,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const priorityLabel = PRIORITY_LABELS[task.priority] || task.priority;
     const isDone = task.status === "done";
+    const dueLabel = task.due_date
+      ? `Due ${new Date(`${task.due_date}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      : null;
 
     item.innerHTML = `
       <div class="board-task-header">
         <span class="board-task-title ${isDone ? "done" : ""}">${task.title}</span>
         <span class="board-task-priority priority-${task.priority}">${priorityLabel}</span>
       </div>
-      <span class="board-task-meta">${task.category}</span>
+      <span class="board-task-meta">${task.category}${dueLabel ? ` · ${dueLabel}` : ""}</span>
     `;
 
     item.addEventListener("dragstart", handleDragStart);
@@ -189,10 +208,40 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   let columnDropZonesSetup = false;
+  let priorityLaneDropZoneSetup = false;
+
+  function renderPriorityLane(tasks) {
+    const laneTasks = tasks.filter(isInPriorityLane);
+    const countNode = boardView.querySelector('[data-lane-count="priority"]');
+    const bodyNode = boardView.querySelector('[data-lane-body="priority"]');
+    const laneNode = boardView.querySelector('[data-board-lane="priority"]');
+
+    if (!countNode || !bodyNode || !laneNode) return;
+
+    countNode.textContent = String(laneTasks.length);
+    bodyNode.innerHTML = "";
+
+    if (laneTasks.length === 0) {
+      const placeholder = document.createElement("p");
+      placeholder.className = "priority-lane-placeholder";
+      placeholder.textContent = "Drag high-priority tasks due today here";
+      bodyNode.appendChild(placeholder);
+    } else {
+      laneTasks.forEach((task) => bodyNode.appendChild(renderBoardTask(task)));
+    }
+
+    if (!priorityLaneDropZoneSetup) {
+      setupPriorityLaneDropZone(laneNode);
+      priorityLaneDropZoneSetup = true;
+    }
+  }
 
   function renderBoard(tasks) {
+    const columnTasks = tasks.filter((task) => !isInPriorityLane(task));
+    renderPriorityLane(tasks);
+
     BOARD_STATUSES.forEach((status) => {
-      const tasksForColumn = tasks.filter((task) => task.status === status);
+      const tasksForColumn = columnTasks.filter((task) => task.status === status);
       const countNode = boardView.querySelector(`[data-column-count="${status}"]`);
       const bodyNode = boardView.querySelector(`[data-column-body="${status}"]`);
       const columnNode = boardView.querySelector(`[data-board-column="${status}"]`);
@@ -260,6 +309,11 @@ document.addEventListener("DOMContentLoaded", () => {
         column.classList.add("drag-target");
       }
     });
+
+    const priorityLane = boardView.querySelector('[data-board-lane="priority"]');
+    if (priorityLane) {
+      priorityLane.classList.add("drag-target");
+    }
   }
 
   function handleDragEnd() {
@@ -274,8 +328,59 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
+    const priorityLane = boardView.querySelector('[data-board-lane="priority"]');
+    if (priorityLane) {
+      priorityLane.classList.remove("drag-target", "drag-over");
+    }
+
     draggedTask = null;
     draggedTaskElement = null;
+  }
+
+  function setupPriorityLaneDropZone(laneNode) {
+    if (laneNode._dropZoneReady) return;
+    laneNode._dropZoneReady = true;
+
+    laneNode.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      laneNode.classList.add("drag-over");
+    });
+
+    laneNode.addEventListener("dragleave", (e) => {
+      if (!laneNode.contains(e.relatedTarget)) {
+        laneNode.classList.remove("drag-over");
+      }
+    });
+
+    laneNode.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      laneNode.classList.remove("drag-over");
+
+      if (!draggedTask) return;
+
+      const originalTask = state.tasks.find((t) => t.id === draggedTask.id);
+      if (!originalTask || !isPriorityLaneEligible(originalTask)) {
+        showErrorFeedback("Only high-priority tasks due today can enter the priority lane.");
+        return;
+      }
+
+      if (originalTask.pinned_priority) return;
+
+      const previousPinned = originalTask.pinned_priority;
+      originalTask.pinned_priority = true;
+      renderBoard(getVisibleTasks());
+
+      try {
+        await TaskAPI.update(draggedTask.id, { pinned_priority: true });
+        await loadTasks();
+      } catch (error) {
+        originalTask.pinned_priority = previousPinned;
+        await loadTasks();
+        showErrorFeedback("Failed to pin task to priority lane. Please try again.");
+      }
+    });
   }
 
   function setupColumnDropZone(columnNode, status) {
@@ -299,7 +404,7 @@ document.addEventListener("DOMContentLoaded", () => {
       e.stopPropagation();
       columnNode.classList.remove("drag-over");
 
-      if (!draggedTask || draggedTask.status === status) {
+      if (!draggedTask) {
         return;
       }
 
@@ -307,22 +412,37 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!originalTask) return;
 
       const originalStatus = originalTask.status;
+      const originalPinned = originalTask.pinned_priority;
+      const statusChanged = draggedTask.status !== status;
+
+      if (!statusChanged && !originalPinned) {
+        return;
+      }
+
       originalTask.status = status;
+      if (originalPinned) {
+        originalTask.pinned_priority = false;
+      }
 
       const visibleTasks = getVisibleTasks();
       renderBoard(visibleTasks);
 
       try {
-        const response = await TaskAPI.update(draggedTask.id, { status });
+        const payload = { status };
+        if (originalPinned) {
+          payload.pinned_priority = false;
+        }
+        const response = await TaskAPI.update(draggedTask.id, payload);
         if (response.error) {
           throw new Error(response.error);
         }
         await loadTasks();
       } catch (error) {
         originalTask.status = originalStatus;
+        originalTask.pinned_priority = originalPinned;
         await loadTasks();
 
-        showErrorFeedback("Failed to update task status. Please try again.");
+        showErrorFeedback("Failed to update task. Please try again.");
       }
     });
   }
@@ -362,6 +482,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     if (view === "board") {
       columnDropZonesSetup = false;
+      priorityLaneDropZoneSetup = false;
     }
     render();
   }
@@ -386,9 +507,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const addTaskForm = document.getElementById("addTaskForm");
   const modalClose = document.getElementById("modalClose");
   const taskTitleInput = document.getElementById("taskTitleInput");
+  const taskDueDateInput = document.getElementById("taskDueDateInput");
 
   function openModal() {
     addTaskModal.classList.remove("hidden");
+    if (taskDueDateInput) {
+      taskDueDateInput.value = todayIso();
+    }
     taskTitleInput.focus();
   }
 
@@ -417,9 +542,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const category = document.getElementById("taskCategorySelect").value;
     const priority = document.getElementById("taskPrioritySelect").value;
+    const dueDate = taskDueDateInput ? taskDueDateInput.value.trim() : "";
+
+    const payload = { title, category, priority };
+    if (dueDate) {
+      payload.due_date = dueDate;
+    }
 
     try {
-      await TaskAPI.create({ title, category, priority });
+      await TaskAPI.create(payload);
       closeModal();
       await loadTasks();
     } catch (err) {
