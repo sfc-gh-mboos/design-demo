@@ -17,13 +17,15 @@
       <nav class="topbar-nav">
         <a href="/" class="nav-link active">Tasks</a>
         <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/heatmap" class="nav-link">Heatmap</a>
       </nav>
     </div>
   </header>
 
   <main class="container">
-    <section class="hero hero--tasks" aria-labelledby="heroTitle">
+    <section class="hero" aria-labelledby="heroTitle">
       <h1 id="heroTitle">Daily Tasks</h1>
+      <p class="subtitle">Plan with clarity, ship with momentum, and keep your day flowing.</p>
     </section>
 
     <div class="toolbar">
@@ -47,6 +49,7 @@
     </section>
 
     <section class="board-view hidden" id="boardView" aria-label="Kanban board">
+      <div class="board-status-columns">
       <article class="board-column" data-board-column="todo">
         <header class="board-column-header">
           <h2 class="board-column-title">To Do</h2>
@@ -70,6 +73,7 @@
         </header>
         <div class="board-column-body" data-column-body="done"></div>
       </article>
+      </div>
     </section>
   </main>
 

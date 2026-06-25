@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Heatmap - Taskflow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="heatmap-page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/heatmap" class="nav-link active">Heatmap</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="heatmap-container" aria-label="Activity heatmap">
+    <section class="heatmap-heading" aria-labelledby="heatmapTitle">
+      <h1 id="heatmapTitle">Activity Heatmap</h1>
+      <div class="heatmap-summary" aria-label="Completion summary">
+        <article class="heatmap-stat">
+          <p class="heatmap-stat-label">Current Streak</p>
+          <p class="heatmap-stat-value"><span id="currentStreak">0</span> <span class="heatmap-stat-unit">days</span></p>
+        </article>
+        <article class="heatmap-stat">
+          <p class="heatmap-stat-label">Longest Streak</p>
+          <p class="heatmap-stat-value"><span id="longestStreak">0</span> <span class="heatmap-stat-unit">days</span></p>
+        </article>
+        <article class="heatmap-stat">
+          <p class="heatmap-stat-label">Total Completions</p>
+          <p class="heatmap-stat-value"><span id="totalCompletions">0</span></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="heatmap-card" aria-label="12 week contribution-style heatmap">
+      <div class="heatmap-grid-layout">
+        <div class="heatmap-y-axis" aria-hidden="true">
+          <span>Mon</span>
+          <span>Wed</span>
+          <span>Fri</span>
+          <span>Sun</span>
+        </div>
+        <div class="heatmap-grid-shell">
+          <div class="heatmap-month-axis" id="heatmapMonthAxis" aria-hidden="true"></div>
+          <div class="heatmap-grid" id="heatmapGrid" role="grid" aria-label="Daily completion intensity"></div>
+        </div>
+      </div>
+      <div class="heatmap-legend" aria-hidden="true">
+        <span>Less</span>
+        <div class="heatmap-legend-scale">
+          <span class="heatmap-cell intensity-0"></span>
+          <span class="heatmap-cell intensity-1"></span>
+          <span class="heatmap-cell intensity-2"></span>
+          <span class="heatmap-cell intensity-3"></span>
+          <span class="heatmap-cell intensity-4"></span>
+          <span class="heatmap-cell intensity-5"></span>
+        </div>
+        <span>More</span>
+      </div>
+    </section>
+  </main>
+
+  <div class="heatmap-tooltip hidden" id="heatmapTooltip" role="status" aria-live="polite"></div>
+
+  <script src="heatmap.js"></script>
+</body>
+</html>

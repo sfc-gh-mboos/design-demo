@@ -92,7 +92,6 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(`Failed to delete task: ${res.statusText}`);
       }
     },
-
   };
 
   // --- State ---
@@ -104,8 +103,13 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   async function loadTasks() {
-    state.tasks = await TaskAPI.getAll(state.filter);
+    state.tasks = await TaskAPI.getAll("all");
     render();
+  }
+
+  function getVisibleTasks() {
+    if (state.filter === "all") return state.tasks;
+    return state.tasks.filter((t) => t.status === state.filter);
   }
 
   // --- UI rendering ---
@@ -113,12 +117,29 @@ document.addEventListener("DOMContentLoaded", () => {
   const PRIORITY_LABELS = { high: "High", medium: "Med", low: "Low" };
   const BOARD_STATUSES = ["todo", "in-progress", "done"];
 
+  function todayIso() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function isDueToday(task) {
+    return task.due_date === todayIso();
+  }
+
+  function isPriorityLaneEligible(task) {
+    return task.priority === "high" && isDueToday(task);
+  }
+
+  function isInPriorityLane(task) {
+    return Boolean(task.pinned_priority) && isPriorityLaneEligible(task);
+  }
+
   function renderTask(task) {
     const li = document.createElement("li");
     li.className = "task-card";
+    li.draggable = true;
     li.dataset.status = task.status;
     li.dataset.category = task.category.toLowerCase();
-    li.dataset.id = task.id;
+    li.dataset.taskId = String(task.id);
 
     li.innerHTML = `
       <div class="status-indicator status-${task.status}"></div>
@@ -136,6 +157,9 @@ document.addEventListener("DOMContentLoaded", () => {
       e.stopPropagation();
       cycleStatus(task);
     });
+
+    li.addEventListener("dragstart", handleDragStart);
+    li.addEventListener("dragend", handleDragEnd);
 
     return li;
   }
@@ -160,61 +184,84 @@ document.addEventListener("DOMContentLoaded", () => {
     const item = document.createElement("article");
     item.className = "board-task-card";
     item.draggable = true;
-    item.dataset.taskId = task.id;
+    item.dataset.taskId = String(task.id);
     item.dataset.status = task.status;
-    
+
     const priorityLabel = PRIORITY_LABELS[task.priority] || task.priority;
     const isDone = task.status === "done";
-    
+    const dueLabel = task.due_date
+      ? `Due ${new Date(`${task.due_date}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      : null;
+
     item.innerHTML = `
       <div class="board-task-header">
-        <span class="board-task-title ${isDone ? 'done' : ''}">${task.title}</span>
+        <span class="board-task-title ${isDone ? "done" : ""}">${task.title}</span>
         <span class="board-task-priority priority-${task.priority}">${priorityLabel}</span>
       </div>
-      <span class="board-task-meta">${task.category}</span>
+      <span class="board-task-meta">${task.category}${dueLabel ? ` · ${dueLabel}` : ""}</span>
     `;
-    
-    // Add drag event listeners
+
     item.addEventListener("dragstart", handleDragStart);
     item.addEventListener("dragend", handleDragEnd);
 
     return item;
   }
 
-  function getVisibleTasks() {
-    return state.tasks;
+  let columnDropZonesSetup = false;
+  let priorityLaneDropZoneSetup = false;
+
+  function renderPriorityLane(tasks) {
+    const laneTasks = tasks.filter(isInPriorityLane);
+    const countNode = boardView.querySelector('[data-lane-count="priority"]');
+    const bodyNode = boardView.querySelector('[data-lane-body="priority"]');
+    const laneNode = boardView.querySelector('[data-board-lane="priority"]');
+
+    if (!countNode || !bodyNode || !laneNode) return;
+
+    countNode.textContent = String(laneTasks.length);
+    bodyNode.innerHTML = "";
+
+    if (laneTasks.length === 0) {
+      const placeholder = document.createElement("p");
+      placeholder.className = "priority-lane-placeholder";
+      placeholder.textContent = "Drag high-priority tasks due today here";
+      bodyNode.appendChild(placeholder);
+    } else {
+      laneTasks.forEach((task) => bodyNode.appendChild(renderBoardTask(task)));
+    }
+
+    if (!priorityLaneDropZoneSetup) {
+      setupPriorityLaneDropZone(laneNode);
+      priorityLaneDropZoneSetup = true;
+    }
   }
 
-  let columnDropZonesSetup = false;
-
   function renderBoard(tasks) {
+    const columnTasks = tasks.filter((task) => !isInPriorityLane(task));
+    renderPriorityLane(tasks);
+
     BOARD_STATUSES.forEach((status) => {
-      const tasksForColumn = tasks.filter((task) => task.status === status);
+      const tasksForColumn = columnTasks.filter((task) => task.status === status);
       const countNode = boardView.querySelector(`[data-column-count="${status}"]`);
       const bodyNode = boardView.querySelector(`[data-column-body="${status}"]`);
       const columnNode = boardView.querySelector(`[data-board-column="${status}"]`);
-      
+
       if (!countNode || !bodyNode || !columnNode) return;
 
-      // Update column count (reflects visible tasks after filtering)
       countNode.textContent = String(tasksForColumn.length);
-      
-      // Clear and repopulate column body
+
       bodyNode.innerHTML = "";
-      
-      // Handle empty state
+
       if (tasksForColumn.length === 0) {
         const placeholder = document.createElement("p");
         placeholder.className = "board-column-placeholder";
         placeholder.textContent = "No tasks";
         bodyNode.appendChild(placeholder);
       } else {
-        // Render tasks in column
         tasksForColumn.forEach((task) => bodyNode.appendChild(renderBoardTask(task)));
       }
     });
-    
-    // Set up drop zones once
+
     if (!columnDropZonesSetup) {
       setupAllColumnDropZones();
       columnDropZonesSetup = true;
@@ -244,42 +291,96 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let draggedTask = null;
   let draggedTaskElement = null;
-  let draggedFromStatus = null;
 
   function handleDragStart(e) {
-    draggedTaskElement = e.target;
+    const el = e.currentTarget;
+    if (!el || !el.dataset.taskId) return;
+    draggedTaskElement = el;
     draggedTaskElement.classList.add("dragging");
-    draggedTask = {
-      id: parseInt(draggedTaskElement.dataset.taskId),
-      status: draggedTaskElement.dataset.status,
-    };
-    draggedFromStatus = draggedTask.status;
+    const id = parseInt(draggedTaskElement.dataset.taskId, 10);
+    const status = draggedTaskElement.dataset.status || "todo";
+    draggedTask = { id, status };
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/html", draggedTaskElement.outerHTML);
-    
-    // Add visual feedback to all columns
-    BOARD_STATUSES.forEach((status) => {
-      const column = boardView.querySelector(`[data-board-column="${status}"]`);
+    e.dataTransfer.setData("text/plain", String(id));
+
+    BOARD_STATUSES.forEach((st) => {
+      const column = boardView.querySelector(`[data-board-column="${st}"]`);
       if (column) {
         column.classList.add("drag-target");
       }
     });
+
+    const priorityLane = boardView.querySelector('[data-board-lane="priority"]');
+    if (priorityLane) {
+      priorityLane.classList.add("drag-target");
+    }
   }
 
-  function handleDragEnd(e) {
-    draggedTaskElement.classList.remove("dragging");
-    
-    // Remove visual feedback from all columns
-    BOARD_STATUSES.forEach((status) => {
-      const column = boardView.querySelector(`[data-board-column="${status}"]`);
+  function handleDragEnd() {
+    if (draggedTaskElement) {
+      draggedTaskElement.classList.remove("dragging");
+    }
+
+    BOARD_STATUSES.forEach((st) => {
+      const column = boardView.querySelector(`[data-board-column="${st}"]`);
       if (column) {
         column.classList.remove("drag-target", "drag-over");
       }
     });
-    
+
+    const priorityLane = boardView.querySelector('[data-board-lane="priority"]');
+    if (priorityLane) {
+      priorityLane.classList.remove("drag-target", "drag-over");
+    }
+
     draggedTask = null;
     draggedTaskElement = null;
-    draggedFromStatus = null;
+  }
+
+  function setupPriorityLaneDropZone(laneNode) {
+    if (laneNode._dropZoneReady) return;
+    laneNode._dropZoneReady = true;
+
+    laneNode.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      laneNode.classList.add("drag-over");
+    });
+
+    laneNode.addEventListener("dragleave", (e) => {
+      if (!laneNode.contains(e.relatedTarget)) {
+        laneNode.classList.remove("drag-over");
+      }
+    });
+
+    laneNode.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      laneNode.classList.remove("drag-over");
+
+      if (!draggedTask) return;
+
+      const originalTask = state.tasks.find((t) => t.id === draggedTask.id);
+      if (!originalTask || !isPriorityLaneEligible(originalTask)) {
+        showErrorFeedback("Only high-priority tasks due today can enter the priority lane.");
+        return;
+      }
+
+      if (originalTask.pinned_priority) return;
+
+      const previousPinned = originalTask.pinned_priority;
+      originalTask.pinned_priority = true;
+      renderBoard(getVisibleTasks());
+
+      try {
+        await TaskAPI.update(draggedTask.id, { pinned_priority: true });
+        await loadTasks();
+      } catch (error) {
+        originalTask.pinned_priority = previousPinned;
+        await loadTasks();
+        showErrorFeedback("Failed to pin task to priority lane. Please try again.");
+      }
+    });
   }
 
   function setupColumnDropZone(columnNode, status) {
@@ -291,60 +392,67 @@ document.addEventListener("DOMContentLoaded", () => {
       e.dataTransfer.dropEffect = "move";
       columnNode.classList.add("drag-over");
     });
-    
+
     columnNode.addEventListener("dragleave", (e) => {
       if (!columnNode.contains(e.relatedTarget)) {
         columnNode.classList.remove("drag-over");
       }
     });
-    
+
     columnNode.addEventListener("drop", async (e) => {
       e.preventDefault();
       e.stopPropagation();
       columnNode.classList.remove("drag-over");
 
-      if (!draggedTask || draggedTask.status === status) {
-        return; // No change needed
+      if (!draggedTask) {
+        return;
       }
-      
-      // Optimistic update: move card immediately in UI
+
       const originalTask = state.tasks.find((t) => t.id === draggedTask.id);
       if (!originalTask) return;
-      
+
       const originalStatus = originalTask.status;
-      originalTask.status = status; // Optimistic update to state
-      
-      // Immediately re-render board with new status
+      const originalPinned = originalTask.pinned_priority;
+      const statusChanged = draggedTask.status !== status;
+
+      if (!statusChanged && !originalPinned) {
+        return;
+      }
+
+      originalTask.status = status;
+      if (originalPinned) {
+        originalTask.pinned_priority = false;
+      }
+
       const visibleTasks = getVisibleTasks();
       renderBoard(visibleTasks);
-      
-      // Persist change via API
+
       try {
-        const response = await TaskAPI.update(draggedTask.id, { status });
+        const payload = { status };
+        if (originalPinned) {
+          payload.pinned_priority = false;
+        }
+        const response = await TaskAPI.update(draggedTask.id, payload);
         if (response.error) {
           throw new Error(response.error);
         }
-        // Refresh to ensure consistency with server
         await loadTasks();
       } catch (error) {
-        // Rollback on failure
         originalTask.status = originalStatus;
+        originalTask.pinned_priority = originalPinned;
         await loadTasks();
-        
-        // Show error feedback
-        showErrorFeedback("Failed to update task status. Please try again.");
+
+        showErrorFeedback("Failed to update task. Please try again.");
       }
     });
   }
 
   function showErrorFeedback(message) {
-    // Create a temporary error message element
     const errorDiv = document.createElement("div");
     errorDiv.className = "error-feedback";
     errorDiv.textContent = message;
     document.body.appendChild(errorDiv);
-    
-    // Remove after 3 seconds
+
     setTimeout(() => {
       errorDiv.remove();
     }, 3000);
@@ -372,9 +480,9 @@ document.addEventListener("DOMContentLoaded", () => {
       button.classList.toggle("active", isActive);
       button.setAttribute("aria-selected", isActive ? "true" : "false");
     });
-    // Reset drop zones setup when switching views
     if (view === "board") {
       columnDropZonesSetup = false;
+      priorityLaneDropZoneSetup = false;
     }
     render();
   }
@@ -399,9 +507,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const addTaskForm = document.getElementById("addTaskForm");
   const modalClose = document.getElementById("modalClose");
   const taskTitleInput = document.getElementById("taskTitleInput");
+  const taskDueDateInput = document.getElementById("taskDueDateInput");
 
   function openModal() {
     addTaskModal.classList.remove("hidden");
+    if (taskDueDateInput) {
+      taskDueDateInput.value = todayIso();
+    }
     taskTitleInput.focus();
   }
 
@@ -430,9 +542,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const category = document.getElementById("taskCategorySelect").value;
     const priority = document.getElementById("taskPrioritySelect").value;
+    const dueDate = taskDueDateInput ? taskDueDateInput.value.trim() : "";
+
+    const payload = { title, category, priority };
+    if (dueDate) {
+      payload.due_date = dueDate;
+    }
 
     try {
-      await TaskAPI.create({ title, category, priority });
+      await TaskAPI.create(payload);
       closeModal();
       await loadTasks();
     } catch (err) {
