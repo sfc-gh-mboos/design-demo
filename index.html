@@ -23,56 +23,9 @@
   </header>
 
   <main class="container">
-    <section class="hero hero--home" aria-labelledby="heroTitle">
-      <div class="hero-card">
-        <div class="hero-main">
-          <p class="hero-eyebrow" id="heroGreeting"></p>
-          <h1 id="heroTitle">Daily Tasks</h1>
-          <p class="hero-subtitle">
-            Plan with clarity, ship with momentum, and keep your day flowing.
-            <time class="hero-date" id="dateLabel"></time>
-          </p>
-          <div class="hero-stats" aria-label="Task summary">
-            <div class="hero-stat">
-              <span class="hero-stat-value" id="heroStatTodo">0</span>
-              <span class="hero-stat-label">To Do</span>
-            </div>
-            <div class="hero-stat">
-              <span class="hero-stat-value" id="heroStatProgress">0</span>
-              <span class="hero-stat-label">In Progress</span>
-            </div>
-            <div class="hero-stat hero-stat--accent">
-              <span class="hero-stat-value" id="heroStatDone">0</span>
-              <span class="hero-stat-label">Done</span>
-            </div>
-          </div>
-          <div class="hero-highlights" aria-label="Daily focus highlights">
-            <span class="hero-highlight">Focus Time</span>
-            <span class="hero-highlight">Top Priorities</span>
-            <span class="hero-highlight">Quick Wins</span>
-          </div>
-        </div>
-        <div class="hero-ring-wrap" role="img" aria-label="Completion progress">
-          <svg class="hero-ring" viewBox="0 0 120 120" aria-hidden="true">
-            <circle class="hero-ring-track" cx="60" cy="60" r="52" fill="none" stroke-width="8"></circle>
-            <circle
-              class="hero-ring-fill"
-              id="heroRingArc"
-              cx="60"
-              cy="60"
-              r="52"
-              fill="none"
-              stroke-width="8"
-              stroke-linecap="round"
-              transform="rotate(-90 60 60)"
-            ></circle>
-          </svg>
-          <div class="hero-ring-center">
-            <span class="hero-ring-pct" id="heroPct">0</span>
-            <span class="hero-ring-caption">Complete</span>
-          </div>
-        </div>
-      </div>
+    <section class="hero" aria-labelledby="heroTitle">
+      <h1 id="heroTitle">Daily Tasks</h1>
+      <p class="subtitle">Plan with clarity, ship with momentum, and keep your day flowing.</p>
     </section>
 
     <div class="toolbar">
@@ -96,20 +49,6 @@
     </section>
 
     <section class="board-view hidden" id="boardView" aria-label="Kanban board">
-      <article class="priority-lane" data-board-lane="priority" aria-label="Priority lane for due today tasks">
-        <header class="priority-lane-header">
-          <div class="priority-lane-heading">
-            <p class="priority-lane-eyebrow">Focus Zone</p>
-            <h2 class="priority-lane-title">Priority Lane</h2>
-            <p class="priority-lane-subtitle">Due Today · High Priority</p>
-          </div>
-          <span class="priority-lane-count" data-lane-count="priority">0</span>
-        </header>
-        <div class="priority-lane-body" data-lane-body="priority">
-          <p class="priority-lane-placeholder">Drag high-priority tasks due today here</p>
-        </div>
-      </article>
-
       <div class="board-status-columns">
       <article class="board-column" data-board-column="todo">
         <header class="board-column-header">
@@ -167,12 +106,6 @@
           <option value="high">High</option>
           <option value="low">Low</option>
         </select>
-        <label class="form-label" for="taskDueDateInput">Due date</label>
-        <input
-          id="taskDueDateInput"
-          class="form-input"
-          type="date"
-        >
         <button type="submit" class="form-submit">Add Task</button>
       </form>
     </div>

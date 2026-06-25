@@ -16,26 +16,19 @@ def get_db():
 
 
 def migrate_add_columns(conn):
-    """Add created_at, completed_at, due_date, and pinned_priority if missing."""
+    """Add created_at and completed_at if they don't exist."""
     cursor = conn.execute("PRAGMA table_info(tasks)")
     cols = [row[1] for row in cursor.fetchall()]
     if "created_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP")
     if "completed_at" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT")
-    if "due_date" not in cols:
-        conn.execute("ALTER TABLE tasks ADD COLUMN due_date TEXT")
-    if "pinned_priority" not in cols:
-        conn.execute("ALTER TABLE tasks ADD COLUMN pinned_priority INTEGER NOT NULL DEFAULT 0")
     # Backfill existing rows
     conn.execute(
         "UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL OR created_at = ''"
     )
     conn.execute(
         "UPDATE tasks SET completed_at = datetime('now') WHERE status = 'done' AND (completed_at IS NULL OR completed_at = '')"
-    )
-    conn.execute(
-        "UPDATE tasks SET pinned_priority = 0 WHERE pinned_priority IS NULL"
     )
 
 
@@ -49,9 +42,7 @@ def init_db():
             category TEXT NOT NULL DEFAULT 'Planning',
             priority TEXT NOT NULL DEFAULT 'medium',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            completed_at TEXT,
-            due_date TEXT,
-            pinned_priority INTEGER NOT NULL DEFAULT 0
+            completed_at TEXT
         )"""
     )
     migrate_add_columns(conn)
@@ -62,25 +53,8 @@ def init_db():
     conn.close()
 
 
-def today_iso():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-
-def _parse_date(s):
-    """Parse YYYY-MM-DD string to date, return None if invalid."""
-    if not s or not isinstance(s, str):
-        return None
-    try:
-        return datetime.strptime(s.strip()[:10], "%Y-%m-%d").date()
-    except ValueError:
-        return None
-
-
 def row_to_dict(row):
-    data = {key: row[key] for key in row.keys()}
-    if "pinned_priority" in data:
-        data["pinned_priority"] = bool(data["pinned_priority"])
-    return data
+    return {key: row[key] for key in row.keys()}
 
 
 def normalize_title(title):
@@ -94,49 +68,6 @@ def normalize_priority(priority):
     if priority and str(priority).strip().lower() in valid:
         return str(priority).strip().lower()
     return None
-
-
-def normalize_due_date(due_date):
-    """Return YYYY-MM-DD string or None. Empty string clears due date."""
-    if due_date is None:
-        return None
-    if isinstance(due_date, str) and not due_date.strip():
-        return ""
-    parsed = _parse_date(due_date)
-    if parsed is None:
-        return False
-    return parsed.strftime("%Y-%m-%d")
-
-
-def normalize_pinned_priority(value):
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return 1 if value else 0
-    if isinstance(value, (int, float)):
-        return 1 if value else 0
-    if isinstance(value, str):
-        lowered = value.strip().lower()
-        if lowered in {"1", "true", "yes"}:
-            return 1
-        if lowered in {"0", "false", "no"}:
-            return 0
-    return None
-
-
-def is_priority_lane_eligible(priority, due_date):
-    return priority == "high" and due_date == today_iso()
-
-
-def resolve_pinned_priority(priority, due_date, pinned_value, existing_pinned=0):
-    """Apply pin only when eligible; auto-clear when not."""
-    if pinned_value is not None:
-        requested = pinned_value
-    else:
-        requested = existing_pinned
-    if requested and is_priority_lane_eligible(priority, due_date):
-        return 1
-    return 0
 
 
 def generate_demo_data(conn):
@@ -198,32 +129,6 @@ def generate_demo_data(conn):
                 (d + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"),
             ),
         )
-    # Seed a few due-today high-priority tasks for the priority lane demo
-    today_str = today_iso()
-    cursor.execute(
-        "INSERT INTO tasks (title, status, category, priority, created_at, due_date, pinned_priority) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (
-            "Ship priority lane UI",
-            "todo",
-            "Engineering",
-            "high",
-            today.strftime("%Y-%m-%d %H:%M:%S"),
-            today_str,
-            1,
-        ),
-    )
-    cursor.execute(
-        "INSERT INTO tasks (title, status, category, priority, created_at, due_date, pinned_priority) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (
-            "Review sprint board mocks",
-            "in-progress",
-            "Design",
-            "high",
-            today.strftime("%Y-%m-%d %H:%M:%S"),
-            today_str,
-            0,
-        ),
-    )
 
 
 # --- Static files ---
@@ -257,21 +162,10 @@ def create_task():
         return jsonify({"error": "title is required"}), 400
     category = data.get("category", "Planning").strip() or "Planning"
     priority = normalize_priority(data.get("priority")) or "medium"
-
-    due_date = None
-    if "due_date" in data:
-        normalized_due = normalize_due_date(data.get("due_date"))
-        if normalized_due is False:
-            return jsonify({"error": "due_date must be YYYY-MM-DD"}), 400
-        due_date = normalized_due or None
-
-    pinned_input = normalize_pinned_priority(data.get("pinned_priority")) if "pinned_priority" in data else None
-    pinned_priority = resolve_pinned_priority(priority, due_date, pinned_input, 0)
-
     conn = get_db()
     cursor = conn.execute(
-        "INSERT INTO tasks (title, status, category, priority, due_date, pinned_priority) VALUES (?, 'todo', ?, ?, ?, ?)",
-        (title, category, priority, due_date, pinned_priority),
+        "INSERT INTO tasks (title, status, category, priority) VALUES (?, 'todo', ?, ?)",
+        (title, category, priority),
     )
     conn.commit()
     row = conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone()
@@ -303,28 +197,6 @@ def update_task(task_id):
         new_priority = existing["priority"]
     new_status = data.get("status", existing["status"])
 
-    if "due_date" in data:
-        normalized_due = normalize_due_date(data.get("due_date"))
-        if normalized_due is False:
-            conn.close()
-            return jsonify({"error": "due_date must be YYYY-MM-DD"}), 400
-        new_due_date = normalized_due or None
-    else:
-        new_due_date = existing["due_date"]
-
-    pinned_input = (
-        normalize_pinned_priority(data.get("pinned_priority"))
-        if "pinned_priority" in data
-        else None
-    )
-    existing_pinned = existing["pinned_priority"] or 0
-    new_pinned_priority = resolve_pinned_priority(
-        new_priority,
-        new_due_date,
-        pinned_input,
-        existing_pinned,
-    )
-
     if new_status == "done":
         completed_at = (
             existing["completed_at"]
@@ -335,15 +207,13 @@ def update_task(task_id):
         completed_at = None
 
     conn.execute(
-        "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=?, due_date=?, pinned_priority=? WHERE id=?",
+        "UPDATE tasks SET title=?, status=?, category=?, priority=?, completed_at=? WHERE id=?",
         (
             new_title,
             new_status,
             data.get("category", existing["category"]),
             new_priority,
             completed_at,
-            new_due_date,
-            new_pinned_priority,
             task_id,
         ),
     )
@@ -367,6 +237,16 @@ def delete_task(task_id):
 
 
 # --- Analytics API ---
+
+
+def _parse_date(s):
+    """Parse YYYY-MM-DD string to date, return None if invalid."""
+    if not s or not isinstance(s, str):
+        return None
+    try:
+        return datetime.strptime(s.strip()[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 
 def _generate_analytics_data(
