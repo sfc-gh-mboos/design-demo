@@ -555,6 +555,101 @@ def analytics_trends():
     return jsonify(data["trends"])
 
 
+def _get_weekly_recap(conn, today=None):
+    """Aggregate task activity for the last 7 calendar days (including today)."""
+    if today is None:
+        today = datetime.now(timezone.utc).date()
+    start = today - timedelta(days=6)
+    start_s = start.isoformat()
+    end_s = today.isoformat()
+
+    created = conn.execute(
+        "SELECT COUNT(*) AS c FROM tasks WHERE date(created_at) BETWEEN ? AND ?",
+        (start_s, end_s),
+    ).fetchone()["c"]
+
+    completed = conn.execute(
+        """
+        SELECT COUNT(*) AS c FROM tasks
+        WHERE status = 'done'
+          AND completed_at IS NOT NULL
+          AND completed_at != ''
+          AND date(completed_at) BETWEEN ? AND ?
+        """,
+        (start_s, end_s),
+    ).fetchone()["c"]
+
+    completion_rate = round((completed / created * 100), 1) if created else 0.0
+
+    avg_row = conn.execute(
+        """
+        SELECT AVG(julianday(completed_at) - julianday(created_at)) AS avg_days
+        FROM tasks
+        WHERE status = 'done'
+          AND completed_at IS NOT NULL
+          AND completed_at != ''
+          AND date(completed_at) BETWEEN ? AND ?
+        """,
+        (start_s, end_s),
+    ).fetchone()
+    avg_days = round(avg_row["avg_days"], 1) if avg_row["avg_days"] is not None else 0.0
+
+    top_cat_row = conn.execute(
+        """
+        SELECT category, COUNT(*) AS c FROM tasks
+        WHERE status = 'done'
+          AND completed_at IS NOT NULL
+          AND completed_at != ''
+          AND date(completed_at) BETWEEN ? AND ?
+        GROUP BY category
+        ORDER BY c DESC
+        LIMIT 1
+        """,
+        (start_s, end_s),
+    ).fetchone()
+    top_category = top_cat_row["category"] if top_cat_row else None
+
+    daily_rows = conn.execute(
+        """
+        SELECT date(completed_at) AS d, COUNT(*) AS c FROM tasks
+        WHERE status = 'done'
+          AND completed_at IS NOT NULL
+          AND completed_at != ''
+          AND date(completed_at) BETWEEN ? AND ?
+        GROUP BY date(completed_at)
+        """,
+        (start_s, end_s),
+    ).fetchall()
+    daily_map = {row["d"]: row["c"] for row in daily_rows}
+
+    daily = []
+    for offset in range(7):
+        day = start + timedelta(days=offset)
+        day_s = day.isoformat()
+        daily.append({"date": day_s, "completed": daily_map.get(day_s, 0)})
+
+    return {
+        "summary": {
+            "completed": completed,
+            "created": created,
+            "completion_rate": completion_rate,
+            "avg_days_to_complete": avg_days,
+            "top_category": top_category,
+        },
+        "daily": daily,
+        "range": {"start": start_s, "end": end_s},
+    }
+
+
+@app.route("/api/analytics/weekly-recap", methods=["GET"])
+def analytics_weekly_recap():
+    conn = get_db()
+    today = datetime.now(timezone.utc).date()
+    recap = _get_weekly_recap(conn, today)
+    conn.close()
+    return jsonify(recap)
+
+
 @app.route("/api/analytics/heatmap", methods=["GET"])
 def analytics_heatmap():
     conn = get_db()
@@ -585,6 +680,11 @@ def analytics_page():
 @app.route("/heatmap")
 def heatmap_page():
     return send_from_directory(".", "heatmap.html")
+
+
+@app.route("/recap")
+def recap_page():
+    return send_from_directory(".", "recap.html")
 
 
 if __name__ == "__main__":

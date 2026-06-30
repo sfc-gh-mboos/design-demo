@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Recap - Taskflow</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/heatmap" class="nav-link">Heatmap</a>
+        <a href="/recap" class="nav-link active">Recap</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="analytics-container recap-container">
+    <section class="recap-page-heading">
+      <h1>Weekly Recap</h1>
+      <p class="subtitle" id="recapRangeLabel">Last 7 days</p>
+    </section>
+
+    <div class="recap-summary kpi-grid" id="recapSummary">
+      <div class="kpi-card">
+        <div class="kpi-value" id="recapCompleted">--</div>
+        <div class="kpi-label">Tasks Completed</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="recapCreated">--</div>
+        <div class="kpi-label">Tasks Created</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="recapCompletionRate">--</div>
+        <div class="kpi-label">Completion Rate</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" id="recapAvgDays">--</div>
+        <div class="kpi-label">Avg Days to Complete</div>
+      </div>
+    </div>
+
+    <div class="recap-highlight-card" id="recapTopCategoryCard">
+      <div class="recap-highlight-label">Top Category This Week</div>
+      <div class="recap-highlight-value" id="recapTopCategory">--</div>
+    </div>
+
+    <section class="recap-daily-section" aria-labelledby="recapDailyTitle">
+      <h2 class="recap-section-title" id="recapDailyTitle">Daily Completions</h2>
+      <div class="recap-daily-row" id="recapDailyRow"></div>
+      <p class="recap-empty-state hidden" id="recapEmptyState">
+        No task activity in this range yet. Create or complete a task to see your recap fill in.
+      </p>
+    </section>
+  </main>
+
+  <script src="recap.js"></script>
+</body>
+</html>
