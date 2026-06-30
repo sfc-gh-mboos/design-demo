@@ -1297,7 +1297,7 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: var(--card-01);
+  background: var(--card-hover);
   border-radius: var(--radius-sm);
   padding: 8px;
 }
