@@ -1165,6 +1165,19 @@ body {
   letter-spacing: -0.01em;
 }
 
+.chart-subtitle {
+  font-size: 0.78rem;
+  color: var(--fg-secondary);
+  margin-bottom: 6px;
+}
+
+.chart-meta {
+  font-size: 0.82rem;
+  color: var(--fg);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
 .chart-card canvas {
   flex: 1;
   max-height: 280px;
