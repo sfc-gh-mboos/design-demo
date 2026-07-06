@@ -239,6 +239,78 @@ def _parse_date(s):
         return None
 
 
+def _build_delivery_timeline(daily_volume, velocity_window_days=7, max_forecast_days=120):
+    """
+    Build delivery forecast timeline from daily volume rows.
+    daily_volume rows are expected in chronological order with keys:
+    date, todo, in_progress, done.
+    """
+    history = []
+    for row in daily_volume:
+        completed = max(0, int(row.get("done", 0)))
+        backlog_remaining = max(0, int(row.get("todo", 0)) + int(row.get("in_progress", 0)))
+        history.append(
+            {
+                "date": row["date"],
+                "completed": completed,
+                "backlog_remaining": backlog_remaining,
+            }
+        )
+
+    window_days = max(1, int(velocity_window_days))
+    window = min(window_days, len(history))
+    if window == 0:
+        velocity = 0.0
+    else:
+        velocity = sum(item["completed"] for item in history[-window:]) / float(window)
+
+    response = {
+        "history": history,
+        "forecast": [],
+        "estimated_delivery_date": None,
+        "forecast_truncated": False,
+        "velocity_basis": {
+            "window_days": window_days,
+            "avg_completed_per_day": round(velocity, 2),
+        },
+    }
+
+    if not history:
+        return response
+
+    last_backlog = float(history[-1]["backlog_remaining"])
+    if last_backlog <= 0:
+        response["estimated_delivery_date"] = history[-1]["date"]
+        return response
+
+    if velocity <= 0:
+        return response
+
+    epsilon = 1e-9
+    cur_backlog = last_backlog
+    cur_date = datetime.strptime(history[-1]["date"], "%Y-%m-%d").date()
+
+    for _ in range(max_forecast_days):
+        cur_date += timedelta(days=1)
+        completed_today = min(velocity, cur_backlog)
+        cur_backlog -= completed_today
+        response["forecast"].append(
+            {
+                "date": cur_date.isoformat(),
+                "projected_completed": round(completed_today, 2),
+                "projected_backlog_remaining": int(max(0, cur_backlog) // 1),
+            }
+        )
+        if cur_backlog < epsilon:
+            response["estimated_delivery_date"] = cur_date.isoformat()
+            break
+
+    if cur_backlog > epsilon:
+        response["forecast_truncated"] = True
+
+    return response
+
+
 def _generate_analytics_data(cohort, start_date=None, end_date=None):
     """
     Generate deterministic dummy analytics data for a given cohort.
@@ -395,7 +467,8 @@ def _generate_analytics_data(cohort, start_date=None, end_date=None):
             "weekly_progress": weekly_progress,
             "priority_focus": priority_focus,
             "productivity_score": productivity_score,
-            "daily_volume": daily_volume
+            "daily_volume": daily_volume,
+            "delivery_timeline": _build_delivery_timeline(daily_volume),
         }
     }
 

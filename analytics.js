@@ -42,6 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let priorityFocusChart = null;
   let productivityScoreChart = null;
   let dailyVolumeChart = null;
+  let deliveryTimelineChart = null;
   // Color palette using Cursor brand colors
   const colors = {
     accent: "#f54e00",
@@ -541,6 +542,216 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function formatDateLabel(isoDate) {
+    const parsed = new Date(`${isoDate}T00:00:00`);
+    return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  function formatDateLong(isoDate) {
+    const parsed = new Date(`${isoDate}T00:00:00`);
+    return parsed.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    });
+  }
+
+  function renderDeliveryTimelineMeta(deliveryTimeline) {
+    const basisEl = document.getElementById("deliveryTimelineBasis");
+    const statusEl = document.getElementById("deliveryTimelineStatus");
+
+    const windowDays = deliveryTimeline.velocity_basis.window_days;
+    const avgPerDay = Number(deliveryTimeline.velocity_basis.avg_completed_per_day || 0).toFixed(2);
+    basisEl.textContent = `Based on trailing ${windowDays}-day avg: ${avgPerDay} completions/day`;
+
+    const history = deliveryTimeline.history || [];
+    const forecast = deliveryTimeline.forecast || [];
+
+    if (history.length === 0) {
+      statusEl.textContent = "No historical data in selected range";
+      if (deliveryTimelineChart) {
+        deliveryTimelineChart.destroy();
+        deliveryTimelineChart = null;
+      }
+      return { history, forecast };
+    }
+
+    if (deliveryTimeline.estimated_delivery_date) {
+      if (forecast.length === 0) {
+        statusEl.textContent = `Backlog clear as of ${formatDateLong(deliveryTimeline.estimated_delivery_date)}`;
+      } else {
+        statusEl.textContent = `Est. backlog cleared: ${formatDateLong(deliveryTimeline.estimated_delivery_date)}`;
+      }
+    } else if (deliveryTimeline.forecast_truncated) {
+      const lastForecast = forecast[forecast.length - 1];
+      const remaining = lastForecast ? lastForecast.projected_backlog_remaining : null;
+      statusEl.textContent = `Beyond 120-day horizon (${remaining ?? "?"} tasks remaining)`;
+    } else {
+      statusEl.textContent = "Forecast unavailable";
+    }
+
+    return { history, forecast };
+  }
+
+  function renderDeliveryTimelineChart(deliveryTimeline) {
+    const { history, forecast } = renderDeliveryTimelineMeta(deliveryTimeline);
+    if (typeof window.Chart !== "function") {
+      if (deliveryTimelineChart) {
+        deliveryTimelineChart.destroy();
+        deliveryTimelineChart = null;
+      }
+      return;
+    }
+
+    const ctx = document.getElementById("deliveryTimelineChart").getContext("2d");
+
+    const labels = [
+      ...history.map((d) => d.date),
+      ...forecast.map((d) => d.date)
+    ];
+
+    const actualCompleted = [
+      ...history.map((d) => d.completed),
+      ...forecast.map(() => null)
+    ];
+    const actualBacklog = [
+      ...history.map((d) => d.backlog_remaining),
+      ...forecast.map(() => null)
+    ];
+    const projectedCompleted = [
+      ...history.map(() => null),
+      ...forecast.map((d) => d.projected_completed)
+    ];
+    const projectedBacklog = [
+      ...history.map(() => null),
+      ...forecast.map((d) => d.projected_backlog_remaining)
+    ];
+
+    if (deliveryTimelineChart) {
+      deliveryTimelineChart.destroy();
+    }
+
+    deliveryTimelineChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: labels.map(formatDateLabel),
+        datasets: [
+          {
+            label: "Completed",
+            data: actualCompleted,
+            borderColor: colors.accent,
+            backgroundColor: colors.accentSubtle,
+            yAxisID: "y",
+            tension: 0.3,
+            pointRadius: 2,
+            spanGaps: false
+          },
+          {
+            label: "Backlog Remaining",
+            data: actualBacklog,
+            borderColor: colors.fg,
+            yAxisID: "y1",
+            tension: 0.3,
+            pointRadius: 2,
+            spanGaps: false
+          },
+          {
+            label: "Projected Completed",
+            data: projectedCompleted,
+            borderColor: colors.accentHover,
+            yAxisID: "y",
+            tension: 0.3,
+            pointRadius: 2,
+            borderDash: [6, 4],
+            spanGaps: false
+          },
+          {
+            label: "Projected Backlog",
+            data: projectedBacklog,
+            borderColor: colors.fgSecondary,
+            yAxisID: "y1",
+            tension: 0.3,
+            pointRadius: 2,
+            borderDash: [6, 4],
+            spanGaps: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              font: { size: 11 },
+              color: colors.fg,
+              padding: 12
+            }
+          },
+          tooltip: {
+            callbacks: {
+              title: function(tooltipItems) {
+                const idx = tooltipItems[0].dataIndex;
+                return formatDateLong(labels[idx]);
+              },
+              label: function(context) {
+                if (context.raw == null) {
+                  return null;
+                }
+                const value = typeof context.raw === "number" ? context.raw.toFixed(2).replace(/\.00$/, "") : context.raw;
+                return `${context.dataset.label}: ${value}`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            position: "left",
+            title: {
+              display: true,
+              text: "Completions/day",
+              color: colors.fgSecondary
+            },
+            ticks: {
+              color: colors.fgSecondary,
+              font: { size: 10 }
+            },
+            grid: {
+              color: "rgba(38, 37, 30, 0.08)"
+            }
+          },
+          y1: {
+            beginAtZero: true,
+            position: "right",
+            title: {
+              display: true,
+              text: "Backlog",
+              color: colors.fgSecondary
+            },
+            ticks: {
+              color: colors.fgSecondary,
+              font: { size: 10 }
+            },
+            grid: {
+              drawOnChartArea: false
+            }
+          },
+          x: {
+            ticks: {
+              color: colors.fgSecondary,
+              font: { size: 10 }
+            },
+            grid: {
+              display: false
+            }
+          }
+        }
+      }
+    });
+  }
+
   // Load and render all data
   async function loadAnalytics(cohort, startDate, endDate) {
     try {
@@ -551,12 +762,18 @@ document.addEventListener("DOMContentLoaded", () => {
       ]);
       
       updateKPIs(summary);
+      renderDeliveryTimelineMeta(trends.delivery_timeline);
+      if (typeof window.Chart !== "function") {
+        console.warn("Chart.js is unavailable; rendering analytics cards without charts.");
+        return;
+      }
       renderCategoryChart(distribution);
       renderPriorityChart(distribution);
       renderWeeklyProgressChart(trends);
       renderPriorityFocusChart(trends);
       renderDailyVolumeChart(trends);
       renderProductivityScoreChart(trends);
+      renderDeliveryTimelineChart(trends.delivery_timeline);
     } catch (error) {
       console.error("Failed to load analytics:", error);
       // Show error feedback
