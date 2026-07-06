@@ -556,10 +556,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function renderDeliveryTimelineChart(deliveryTimeline) {
+  function renderDeliveryTimelineMeta(deliveryTimeline) {
     const basisEl = document.getElementById("deliveryTimelineBasis");
     const statusEl = document.getElementById("deliveryTimelineStatus");
-    const ctx = document.getElementById("deliveryTimelineChart").getContext("2d");
 
     const windowDays = deliveryTimeline.velocity_basis.window_days;
     const avgPerDay = Number(deliveryTimeline.velocity_basis.avg_completed_per_day || 0).toFixed(2);
@@ -574,7 +573,7 @@ document.addEventListener("DOMContentLoaded", () => {
         deliveryTimelineChart.destroy();
         deliveryTimelineChart = null;
       }
-      return;
+      return { history, forecast };
     }
 
     if (deliveryTimeline.estimated_delivery_date) {
@@ -590,6 +589,21 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       statusEl.textContent = "Forecast unavailable";
     }
+
+    return { history, forecast };
+  }
+
+  function renderDeliveryTimelineChart(deliveryTimeline) {
+    const { history, forecast } = renderDeliveryTimelineMeta(deliveryTimeline);
+    if (typeof window.Chart !== "function") {
+      if (deliveryTimelineChart) {
+        deliveryTimelineChart.destroy();
+        deliveryTimelineChart = null;
+      }
+      return;
+    }
+
+    const ctx = document.getElementById("deliveryTimelineChart").getContext("2d");
 
     const labels = [
       ...history.map((d) => d.date),
@@ -748,6 +762,11 @@ document.addEventListener("DOMContentLoaded", () => {
       ]);
       
       updateKPIs(summary);
+      renderDeliveryTimelineMeta(trends.delivery_timeline);
+      if (typeof window.Chart !== "function") {
+        console.warn("Chart.js is unavailable; rendering analytics cards without charts.");
+        return;
+      }
       renderCategoryChart(distribution);
       renderPriorityChart(distribution);
       renderWeeklyProgressChart(trends);
