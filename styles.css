@@ -23,11 +23,11 @@
   --radius-sm: 8px;
   --panel: #ffffff;
   --heat-0: var(--panel);
-  --heat-1: rgba(245, 78, 0, 0.12);
-  --heat-2: rgba(245, 78, 0, 0.26);
-  --heat-3: rgba(245, 78, 0, 0.42);
-  --heat-4: rgba(245, 78, 0, 0.62);
-  --heat-5: rgba(245, 78, 0, 0.88);
+  --heat-1: rgba(245, 78, 0, 0.14);
+  --heat-2: rgba(245, 78, 0, 0.28);
+  --heat-3: rgba(245, 78, 0, 0.45);
+  --heat-4: rgba(245, 78, 0, 0.68);
+  --heat-5: var(--accent);
 }
 
 html {
@@ -1229,7 +1229,7 @@ body {
 /* ---- Activity Heatmap ---- */
 
 .heatmap-container {
-  max-width: 900px;
+  max-width: 890px;
   margin: 0 auto;
   padding: 0 24px 80px;
 }
@@ -1281,7 +1281,7 @@ body {
 
 .heatmap-panel {
   --heat-gap: 6px;
-  --heat-gutter: 34px;
+  --heat-gutter: 32px;
   --heat-columns: 12;
   background: var(--panel);
   border: 1px solid var(--card-border);
