@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Heatmap - Taskflow</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/heatmap" class="nav-link active">Heatmap</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="heatmap-page">
+    <section class="heatmap-panel" aria-labelledby="heatmapTitle">
+      <h1 class="heatmap-title" id="heatmapTitle">Activity Heatmap</h1>
+
+      <div class="heatmap-stats">
+        <div class="heatmap-stat">
+          <span class="heatmap-stat-label" id="currentStreakLabel">Current Streak</span>
+          <p class="heatmap-stat-value">
+            <span id="currentStreakValue" aria-labelledby="currentStreakLabel">0</span>
+            <span class="heatmap-stat-unit">days</span>
+          </p>
+        </div>
+        <div class="heatmap-stat">
+          <span class="heatmap-stat-label" id="longestStreakLabel">Longest Streak</span>
+          <p class="heatmap-stat-value">
+            <span id="longestStreakValue" aria-labelledby="longestStreakLabel">0</span>
+            <span class="heatmap-stat-unit">days</span>
+          </p>
+        </div>
+        <div class="heatmap-stat">
+          <span class="heatmap-stat-label" id="totalCompletionsLabel">Total Completions</span>
+          <p class="heatmap-stat-value">
+            <span id="totalCompletionsValue" aria-labelledby="totalCompletionsLabel">0</span>
+          </p>
+        </div>
+      </div>
+
+      <section class="heatmap-card" aria-labelledby="heatmapGridTitle">
+        <h2 class="sr-only" id="heatmapGridTitle">Task completions over the last 12 weeks</h2>
+        <div class="heatmap-months" id="heatmapMonthLabels" aria-hidden="true"></div>
+        <div class="heatmap-body">
+          <div class="heatmap-days" aria-hidden="true">
+            <span>Mon</span>
+            <span>Wed</span>
+            <span>Fri</span>
+            <span>Sun</span>
+          </div>
+          <div class="heatmap-grid" id="heatmapGrid"></div>
+        </div>
+        <div class="heatmap-legend">
+          <span class="heatmap-legend-text">Less</span>
+          <div class="heatmap-legend-cells" id="heatmapLegendCells" aria-hidden="true"></div>
+          <span class="heatmap-legend-text">More</span>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div class="heatmap-tooltip" id="heatmapTooltip" role="status" aria-live="polite"></div>
+
+  <script src="heatmap.js"></script>
+</body>
+</html>
