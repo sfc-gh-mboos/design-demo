@@ -135,6 +135,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const cell = e.target.closest(".heatmap-cell");
       if (cell && !cell.contains(e.relatedTarget)) hideTooltip();
     });
+    /* The grid scrolls horizontally on narrow screens, which does not bubble to window. */
+    grid.closest(".heatmap-scroll").addEventListener("scroll", hideTooltip, { passive: true });
     window.addEventListener("scroll", hideTooltip, { passive: true });
   }
 
