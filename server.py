@@ -7,6 +7,10 @@ from datetime import datetime, timedelta, timezone
 app = Flask(__name__, static_folder=".", static_url_path="")
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "taskflow.db")
 
+# Width of the activity heatmap grid. Demo data spans the same window so a fresh
+# database fills every column.
+HEATMAP_WEEKS = 12
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -70,7 +74,7 @@ def normalize_priority(priority):
 
 
 def generate_demo_data(conn):
-    """Create ~60 tasks spanning the past 8 weeks with realistic patterns."""
+    """Create ~90 tasks spanning the past 12 weeks with realistic patterns."""
     import random
     categories = ["Planning", "Design", "Engineering", "Operations"]
     priorities = ["high", "medium", "low"]
@@ -89,10 +93,11 @@ def generate_demo_data(conn):
     cursor = conn.cursor()
     task_id = 1
     # More tasks in recent weeks; improving completion trend
-    for week_offset in range(7, -1, -1):
+    oldest_week = HEATMAP_WEEKS - 1
+    for week_offset in range(oldest_week, -1, -1):
         week_start = base - timedelta(weeks=week_offset)
         n_tasks = random.randint(6, 10) if week_offset > 0 else random.randint(8, 12)
-        completion_pct = min(0.95, 0.5 + 0.05 * (7 - week_offset))
+        completion_pct = min(0.95, 0.5 + 0.04 * (oldest_week - week_offset))
         for _ in range(n_tasks):
             day_offset = random.randint(0, 6)
             created = week_start + timedelta(days=day_offset)
@@ -457,7 +462,7 @@ def _heatmap_summary(conn, today):
 
 def _build_heatmap_grid(conn, today):
     current_week_monday = today - timedelta(days=today.weekday())
-    grid_start = current_week_monday - timedelta(weeks=11)
+    grid_start = current_week_monday - timedelta(weeks=HEATMAP_WEEKS - 1)
     grid_end = current_week_monday + timedelta(days=6)
     daily_counts_rows = conn.execute(
         """
@@ -492,7 +497,7 @@ def _build_heatmap_grid(conn, today):
 
     weeks = []
     month_labels = []
-    for week_index in range(12):
+    for week_index in range(HEATMAP_WEEKS):
         week_start = grid_start + timedelta(weeks=week_index)
         if week_index == 0 or week_start.month != (week_start - timedelta(weeks=1)).month:
             month_labels.append({"month": week_start.strftime("%b"), "column": week_index})
