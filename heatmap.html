@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Heatmap - Taskflow</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">Taskflow</span>
+      </div>
+      <nav class="topbar-nav">
+        <a href="/" class="nav-link">Tasks</a>
+        <a href="/analytics" class="nav-link">Analytics</a>
+        <a href="/heatmap" class="nav-link active">Activity</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="heatmap-container">
+    <section class="heatmap-header">
+      <h1 class="heatmap-title">Activity Heatmap</h1>
+      <dl class="heatmap-stats">
+        <div class="heatmap-stat">
+          <dt class="heatmap-stat-label">Current Streak</dt>
+          <dd class="heatmap-stat-value">
+            <span class="heatmap-stat-number" id="statCurrentStreak">--</span>
+            <span class="heatmap-stat-unit">days</span>
+          </dd>
+        </div>
+        <div class="heatmap-stat">
+          <dt class="heatmap-stat-label">Longest Streak</dt>
+          <dd class="heatmap-stat-value">
+            <span class="heatmap-stat-number" id="statLongestStreak">--</span>
+            <span class="heatmap-stat-unit">days</span>
+          </dd>
+        </div>
+        <div class="heatmap-stat">
+          <dt class="heatmap-stat-label">Total Completions</dt>
+          <dd class="heatmap-stat-value">
+            <span class="heatmap-stat-number" id="statTotalCompletions">--</span>
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="heatmap-panel" aria-labelledby="heatmapPanelTitle">
+      <h2 class="visually-hidden" id="heatmapPanelTitle">Daily task completions over the last 12 weeks</h2>
+      <div class="heatmap-scroll">
+        <div class="heatmap-plot">
+          <div class="heatmap-months" id="heatmapMonths" aria-hidden="true"></div>
+          <div class="heatmap-body">
+            <div class="heatmap-daylabels" id="heatmapDayLabels" aria-hidden="true"></div>
+            <div class="heatmap-grid" id="heatmapGrid" role="list" aria-label="Task completions per day"></div>
+          </div>
+        </div>
+      </div>
+      <div class="heatmap-legend">
+        <span class="heatmap-legend-text">Less</span>
+        <div class="heatmap-legend-scale" id="heatmapLegend" aria-hidden="true"></div>
+        <span class="heatmap-legend-text">More</span>
+      </div>
+    </section>
+  </main>
+
+  <div class="heatmap-tooltip" id="heatmapTooltip" role="tooltip" hidden></div>
+
+  <script src="heatmap.js"></script>
+</body>
+</html>
